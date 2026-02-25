@@ -1,0 +1,123 @@
+:root {
+  /* Color Palette - Lived-in & Warm */
+  --bg-primary: #faf8f5;
+  /* Warm Paper */
+  --bg-secondary: #f0ebe1;
+  /* Slightly darker paper */
+  --bg-glass: rgba(255, 255, 255, 0.65);
+
+  --text-primary: #4a443e;
+  /* Deep warm gray/brown */
+  --text-secondary: #7a736a;
+  /* Muted warm gray */
+  --text-muted: #9e978e;
+  /* Even more muted */
+
+  --accent-primary: #c87b5a;
+  /* Terracotta */
+  --accent-hover: #b06a4a;
+  --accent-gradient: linear-gradient(135deg, #c87b5a, #dfa974);
+
+  --success: #6b8f71;
+  /* Sage Green */
+  --danger: #cc6a6a;
+  /* Soft Muted Red */
+  --warning: #d9a05b;
+  /* Warm Mustard */
+
+  /* Panel settings - softer and cozier */
+  --glass-border: rgba(210, 200, 190, 0.4);
+  --glass-shadow: 0 4px 24px -4px rgba(74, 68, 62, 0.08);
+  --glass-blur: blur(8px);
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Radii - softer */
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-image:
+    linear-gradient(rgba(250, 248, 245, 0.85), rgba(250, 248, 245, 0.85)),
+    url('https://images.unsplash.com/photo-1524758631624-e2822e304c36?q=80&w=2000&auto=format&fit=crop');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-glass);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Utilities */
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-lg);
+}
+
+.text-gradient {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
