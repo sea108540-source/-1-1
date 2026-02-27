@@ -12,9 +12,10 @@ interface ItemFormProps {
     onSave: (item: Item) => void;
     onDelete?: (id: string) => void;
     initialData?: Item | null;
+    groupId?: string;
 }
 
-export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onDelete, initialData }) => {
+export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onDelete, initialData, groupId }) => {
     const [title, setTitle] = useState('');
     const [url, setUrl] = useState('');
     const [memo, setMemo] = useState('');
@@ -59,6 +60,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
             createdAt: initialData?.createdAt || Date.now(),
             obtained: initialData?.obtained || false,
             obtainedAt: initialData?.obtainedAt,
+            group_id: initialData?.group_id || groupId || undefined,
         };
         onSave(item);
         onClose();

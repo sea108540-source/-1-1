@@ -13,6 +13,7 @@ export type Item = {
     createdAt: number;
     obtained: boolean;
     obtainedAt?: number;
+    group_id?: string | null;
 };
 
 export type Profile = {
@@ -21,4 +22,11 @@ export type Profile = {
     username: string | null;
     avatar_url: string | null;
     updated_at?: string;
+};
+
+export type Group = {
+    id: string;
+    name: string;
+    created_by: string;
+    created_at: string;
 };

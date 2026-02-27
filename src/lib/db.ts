@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 import type { DBSchema, IDBPDatabase } from 'idb';
 import { supabase } from './supabase';
-import type { Item, Profile } from './types';
+import type { Item, Profile, Group } from './types';
 
 const DB_NAME = 'WishlistDB';
 const DB_VERSION = 1;
@@ -53,6 +53,7 @@ const mapToDbItem = (item: Item, userId: string) => ({
   created_at: item.createdAt,
   obtained: item.obtained,
   obtained_at: item.obtainedAt || null,
+  group_id: item.group_id || null,
 });
 
 const mapFromDbItem = (row: any): Item => ({
@@ -67,6 +68,7 @@ const mapFromDbItem = (row: any): Item => ({
   createdAt: row.created_at,
   obtained: row.obtained,
   obtainedAt: row.obtained_at || undefined,
+  group_id: row.group_id || undefined,
 });
 
 // ========================
@@ -76,7 +78,11 @@ const mapFromDbItem = (row: any): Item => ({
 export const getItems = async (): Promise<Item[]> => {
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.user) {
-    const { data, error } = await supabase.from('items').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false });
     if (error) { console.error('Supabase fetch error:', error); return []; }
     return data.map(mapFromDbItem);
   }
@@ -184,16 +190,40 @@ export const addFriend = async (friendId: string) => {
 };
 
 export const getFriends = async (): Promise<Profile[]> => {
-  const { data, error } = await supabase
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return [];
+
+  // 1. Fetch friend IDs
+  const { data: friendships, error: friendError } = await supabase
     .from('friendships')
-    .select('friend_id, profiles!friendships_friend_id_fkey(*)')
+    .select('friend_id')
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('getFriends error:', error);
+  if (friendError) {
+    console.error('getFriends error fetching friendships:', friendError);
     return [];
   }
-  return data.map((d: any) => d.profiles);
+
+  if (!friendships || friendships.length === 0) return [];
+
+  const friendIds = friendships.map(f => f.friend_id);
+
+  // 2. Fetch profiles
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .in('id', friendIds);
+
+  if (profileError) {
+    console.error('getFriends error fetching profiles:', profileError);
+    return [];
+  }
+
+  // Preserve ordering from friendships if possible
+  const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+  const orderedProfiles = friendIds.map(id => profileMap.get(id)).filter(Boolean) as Profile[];
+
+  return orderedProfiles;
 };
 
 export const getFriendItems = async (friendId: string): Promise<Item[]> => {
@@ -205,6 +235,101 @@ export const getFriendItems = async (friendId: string): Promise<Item[]> => {
 
   if (error) {
     console.error('getFriendItems error:', error);
+    return [];
+  }
+  return data.map(mapFromDbItem);
+};
+
+// ========================
+// Groups
+// ========================
+
+export const createGroup = async (name: string): Promise<Group | null> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('Not logged in');
+
+  const { data: group, error: groupError } = await supabase
+    .from('groups')
+    .insert({ name, created_by: session.user.id })
+    .select()
+    .single();
+
+  if (groupError) {
+    console.error('Error creating group:', groupError);
+    throw groupError;
+  }
+
+  // Add the creator as the first member
+  const { error: memberError } = await supabase
+    .from('group_members')
+    .insert({ group_id: group.id, user_id: session.user.id });
+
+  if (memberError) {
+    console.error('Error adding creator to group members:', memberError);
+    throw memberError;
+  }
+
+  return group;
+};
+
+export const getGroups = async (): Promise<Group[]> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return [];
+
+  const { data, error } = await supabase
+    .from('groups')
+    .select('*, group_members!inner(user_id)')
+    .eq('group_members.user_id', session.user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching groups:', error);
+    return [];
+  }
+
+  // Remove the joined data from the type to match Group type
+  return data.map((g: any) => ({
+    id: g.id,
+    name: g.name,
+    created_by: g.created_by,
+    created_at: g.created_at
+  }));
+};
+
+export const getGroupMembers = async (groupId: string): Promise<Profile[]> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return [];
+
+  const { data, error } = await supabase
+    .from('group_members')
+    .select('profiles!inner(*)')
+    .eq('group_id', groupId);
+
+  if (error) {
+    console.error('Error fetching group members:', error);
+    return [];
+  }
+
+  return data.map((d: any) => d.profiles);
+};
+
+export const addGroupMember = async (groupId: string, userId: string) => {
+  const { error } = await supabase
+    .from('group_members')
+    .insert({ group_id: groupId, user_id: userId });
+
+  if (error) throw error;
+};
+
+export const getGroupItems = async (groupId: string): Promise<Item[]> => {
+  const { data, error } = await supabase
+    .from('items')
+    .select('*')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('getGroupItems error:', error);
     return [];
   }
   return data.map(mapFromDbItem);

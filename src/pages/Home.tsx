@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { FriendManager } from '../components/friends/FriendManager';
+import { GroupManager } from '../components/groups/GroupManager';
 
 export const Home: React.FC = () => {
     const { user, loading: authLoading } = useAuth();
@@ -19,7 +20,7 @@ export const Home: React.FC = () => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<Item | null>(null);
-    const [currentView, setCurrentView] = useState<'my-wishlist' | 'friends'>('my-wishlist');
+    const [currentView, setCurrentView] = useState<'my-wishlist' | 'friends' | 'groups'>('my-wishlist');
 
     // Search & Filter state
     const [searchQuery, setSearchQuery] = useState('');
@@ -172,6 +173,14 @@ export const Home: React.FC = () => {
         );
     }
 
+    if (currentView === 'groups') {
+        return (
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
+                <GroupManager onBack={() => setCurrentView('my-wishlist')} />
+            </div>
+        );
+    }
+
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
 
@@ -186,10 +195,25 @@ export const Home: React.FC = () => {
 
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
 
-                    {/* Friends Button - Always visible */}
+                    {/* Groups Button */}
                     <Button
                         variant="secondary"
                         icon={<Users size={18} />}
+                        onClick={() => {
+                            if (user) {
+                                setCurrentView('groups');
+                            } else {
+                                setIsAuthModalOpen(true);
+                            }
+                        }}
+                    >
+                        グループ
+                    </Button>
+
+                    {/* Friends Button - Always visible */}
+                    <Button
+                        variant="secondary"
+                        icon={<UserIcon size={18} />}
                         onClick={() => {
                             if (user) {
                                 setCurrentView('friends');
