@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Item } from '../lib/types';
 import { Badge } from './ui/Badge';
-import { ExternalLink, CheckCircle2, Clock } from 'lucide-react';
+import { ExternalLink, CheckCircle2, Clock, Lock, Users } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ItemCardProps {
@@ -54,6 +54,11 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onToggleObtained, onCl
                             {item.title || '無題のアイテム'}
                         </h3>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            {item.is_public === false && (
+                                <span title="非公開" style={{ color: 'var(--text-muted)' }}>
+                                    <Lock size={16} />
+                                </span>
+                            )}
                             {getPriorityBadge(item.priority)}
                         </div>
                     </div>
@@ -61,10 +66,28 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onToggleObtained, onCl
                     <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         {item.price && <span>{item.price}</span>}
                         {item.category && <Badge>{item.category}</Badge>}
+                        {item.group && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', fontWeight: 500, background: 'rgba(var(--primary-rgb, 14, 165, 233), 0.1)', padding: '2px 8px', borderRadius: '12px' }} title="グループ">
+                                <Users size={12} />
+                                <span style={{ fontSize: '0.75rem' }}>{item.group.name}</span>
+                            </span>
+                        )}
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                             <Clock size={14} />
                             {format(item.createdAt, 'yyyy/MM/dd')}
                         </span>
+                        {item.creator && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '12px', border: '1px solid var(--glass-border)' }} title="追加した人">
+                                {item.creator.avatar_url ? (
+                                    <img src={item.creator.avatar_url} style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover' }} alt="Avatar" />
+                                ) : (
+                                    <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 'bold' }}>
+                                        {(item.creator.username || item.creator.display_name || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                                <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>{item.creator.username || item.creator.display_name}</span>
+                            </span>
+                        )}
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
@@ -80,17 +103,25 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onToggleObtained, onCl
                             </a>
                         ) : <div />}
 
-                        <button
-                            className={`btn btn-sm ${item.obtained ? 'btn-ghost' : 'btn-secondary'}`}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onToggleObtained(item.id, item.obtained);
-                            }}
-                            style={{ padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                        >
-                            <CheckCircle2 size={16} color={item.obtained ? 'var(--success)' : 'inherit'} />
-                            {item.obtained ? '入手済み' : '未入手'}
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+                            <button
+                                className={`btn btn-sm ${item.obtained ? 'btn-ghost' : 'btn-secondary'}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleObtained(item.id, item.obtained);
+                                }}
+                                style={{ padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                            >
+                                <CheckCircle2 size={16} color={item.obtained ? 'var(--success)' : 'inherit'} />
+                                {item.obtained ? '入手済み' : '未入手'}
+                            </button>
+                            {item.obtained && item.obtainedAt && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    <Clock size={10} />
+                                    {format(item.obtainedAt, 'yyyy/MM/dd HH:mm')}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 

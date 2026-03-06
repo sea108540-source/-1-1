@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import type { Item } from '../lib/types';
+import type { Item, Group } from '../lib/types';
+import { getGroups } from '../lib/db';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -23,6 +24,18 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
     const [category, setCategory] = useState('');
     const [priority, setPriority] = useState<'high' | 'mid' | 'low'>('mid');
     const [image, setImage] = useState<{ type: 'blob' | 'dataUrl' | 'url'; value: string } | undefined>(undefined);
+    const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+    const [isPublic, setIsPublic] = useState(true);
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+
+    useEffect(() => {
+        const fetchGroups = async () => {
+            const data = await getGroups();
+            setGroups(data);
+        };
+        fetchGroups();
+    }, []);
 
     useEffect(() => {
         if (isOpen) {
@@ -34,6 +47,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                 setCategory(initialData.category || '');
                 setPriority(initialData.priority || 'mid');
                 setImage(initialData.image);
+                setIsPublic(initialData.is_public ?? true);
+                setSelectedGroupId(initialData.group_id || groupId || '');
             } else {
                 setTitle('');
                 setUrl('');
@@ -42,9 +57,55 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                 setCategory('');
                 setPriority('mid');
                 setImage(undefined);
+                setIsFetchingMetadata(false);
+                setIsPublic(true);
+                setSelectedGroupId(groupId || '');
             }
         }
     }, [isOpen, initialData]);
+
+    const fetchMetadata = async (targetUrl: string) => {
+        if (!targetUrl.trim() || isFetchingMetadata) return;
+
+        // Basic URL validation
+        let validUrl;
+        try {
+            validUrl = new URL(targetUrl.trim());
+        } catch (_) {
+            return; // Invalid URL, do nothing
+        }
+
+        setIsFetchingMetadata(true);
+        try {
+            const apiEndpoint = `https://api.microlink.io/?url=${encodeURIComponent(validUrl.toString())}`;
+            const res = await fetch(apiEndpoint);
+            if (!res.ok) throw new Error('Failed to fetch metadata');
+            const data = await res.json();
+
+            if (data.status === 'success' && data.data) {
+                // Only overwrite if current fields are empty to respect user input
+                if (!title.trim() && data.data.title) {
+                    setTitle(data.data.title);
+                }
+
+                // Only overwrite if no image is currently set
+                if (!image && data.data.image?.url) {
+                    setImage({ type: 'url', value: data.data.image.url });
+                }
+            }
+        } catch (err) {
+            console.error('Metadata fetch error:', err);
+            // Ignore errors silently for UX, let them type manually
+        } finally {
+            setIsFetchingMetadata(false);
+        }
+    };
+
+    const handleUrlBlur = () => {
+        if (url && !initialData) {
+            fetchMetadata(url);
+        }
+    };
 
     const handleSave = () => {
         const defaultTitle = title.trim() || '無題のアイテム';
@@ -60,7 +121,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
             createdAt: initialData?.createdAt || Date.now(),
             obtained: initialData?.obtained || false,
             obtainedAt: initialData?.obtainedAt,
-            group_id: initialData?.group_id || groupId || undefined,
+            group_id: selectedGroupId || undefined,
+            is_public: isPublic,
         };
         onSave(item);
         onClose();
@@ -90,6 +152,10 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
         if (textData) {
             if (textData.startsWith('http://') || textData.startsWith('https://')) {
                 setUrl((prev) => prev ? prev : textData);
+                // Trigger metadata fetch on paste immediately if it's a new item
+                if (!initialData) {
+                    fetchMetadata(textData);
+                }
             } else {
                 setTitle((prev) => prev ? prev : textData);
             }
@@ -197,14 +263,21 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                     autoFocus
                 />
 
-                <Input
-                    label="URL"
-                    type="url"
-                    icon={<Link size={16} />}
-                    placeholder="https://example.com/item"
-                    value={url}
-                    onChange={e => setUrl(e.target.value)}
-                />
+                <div className="input-group">
+                    <label className="input-label" htmlFor="item-url-input" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        URL
+                        {isFetchingMetadata && <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 'normal', fontStyle: 'italic' }}>情報を取得中...</span>}
+                    </label>
+                    <Input
+                        id="item-url-input"
+                        type="url"
+                        icon={<Link size={16} />}
+                        placeholder="https://example.com/item"
+                        value={url}
+                        onChange={e => setUrl(e.target.value)}
+                        onBlur={handleUrlBlur}
+                    />
+                </div>
 
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     <div className="input-wrapper" style={{ flex: '1 1 120px' }}>
@@ -240,6 +313,36 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                         onChange={e => setMemo(e.target.value)}
                     />
                 </div>
+
+                <div className="input-wrapper">
+                    <label className="input-label">共有するグループ</label>
+                    <select
+                        className="input-field"
+                        value={selectedGroupId}
+                        onChange={e => setSelectedGroupId(e.target.value)}
+                        disabled={!!groupId}
+                    >
+                        <option value="">（選択しない・個人用）</option>
+                        {groups.map(g => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {!groupId && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                        <input
+                            type="checkbox"
+                            id="is-public-toggle"
+                            checked={isPublic}
+                            onChange={(e) => setIsPublic(e.target.checked)}
+                            style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="is-public-toggle" style={{ fontSize: '0.9rem', color: 'var(--text-primary)', cursor: 'pointer', userSelect: 'none' }}>
+                            このアイテムを友達に公開する
+                        </label>
+                    </div>
+                )}
 
             </div>
         </Modal>

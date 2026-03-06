@@ -54,6 +54,7 @@ const mapToDbItem = (item: Item, userId: string) => ({
   obtained: item.obtained,
   obtained_at: item.obtainedAt || null,
   group_id: item.group_id || null,
+  is_public: item.is_public ?? true,
 });
 
 const mapFromDbItem = (row: any): Item => ({
@@ -69,6 +70,9 @@ const mapFromDbItem = (row: any): Item => ({
   obtained: row.obtained,
   obtainedAt: row.obtained_at || undefined,
   group_id: row.group_id || undefined,
+  is_public: row.is_public ?? true,
+  creator: row.profiles || undefined,
+  group: row.groups || undefined,
 });
 
 // ========================
@@ -80,7 +84,7 @@ export const getItems = async (): Promise<Item[]> => {
   if (session?.user) {
     const { data, error } = await supabase
       .from('items')
-      .select('*')
+      .select('*, groups(id, name)')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
     if (error) { console.error('Supabase fetch error:', error); return []; }
@@ -322,15 +326,35 @@ export const addGroupMember = async (groupId: string, userId: string) => {
 };
 
 export const getGroupItems = async (groupId: string): Promise<Item[]> => {
+  // 1. Fetch the items for the group
   const { data, error } = await supabase
     .from('items')
     .select('*')
     .eq('group_id', groupId)
     .order('created_at', { ascending: false });
 
-  if (error) {
+  if (error || !data) {
     console.error('getGroupItems error:', error);
     return [];
   }
-  return data.map(mapFromDbItem);
+
+  // 2. Fetch profiles for the unique user_ids in the items
+  const userIds = Array.from(new Set(data.map(item => item.user_id).filter(Boolean)));
+
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .in('id', userIds);
+
+  if (profileError) {
+    console.error('Error fetching group item profiles:', profileError);
+  }
+
+  const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+  // 3. Map manually, attaching the creator profile
+  return data.map(row => mapFromDbItem({
+    ...row,
+    profiles: profileMap.get(row.user_id) || undefined
+  }));
 };

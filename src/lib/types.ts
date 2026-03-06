@@ -14,6 +14,9 @@ export type Item = {
     obtained: boolean;
     obtainedAt?: number;
     group_id?: string | null;
+    is_public?: boolean;
+    creator?: Profile;
+    group?: { id: string; name: string };
 };
 
 export type Profile = {

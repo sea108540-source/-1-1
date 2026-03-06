@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getItems, addItem, updateItem, deleteItem, addMultipleItems } from '../lib/db';
 import type { Item } from '../lib/types';
-import { generateShareLink, parseSharedItemsFromUrl, exportDataAsJsonFile, importDataFromJsonFile } from '../lib/shareUtils';
+import { generateShareLink, parseSharedItemsFromUrl, importDataFromJsonFile } from '../lib/shareUtils';
 import { ItemCard } from '../components/ItemCard';
 import { ItemForm } from '../components/ItemForm';
+import { parsePriceString } from '../lib/utils';
 import { AuthModal } from '../components/AuthModal';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, Search, Share2, Download, Upload, Check, User as UserIcon, LogOut, Users } from 'lucide-react';
+import { Plus, Search, Share2, Upload, Check, User as UserIcon, Users, Settings as SettingsIcon } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
 import { FriendManager } from '../components/friends/FriendManager';
 import { GroupManager } from '../components/groups/GroupManager';
+import { Settings } from './Settings';
 
 export const Home: React.FC = () => {
     const { user, loading: authLoading } = useAuth();
@@ -20,11 +21,12 @@ export const Home: React.FC = () => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<Item | null>(null);
-    const [currentView, setCurrentView] = useState<'my-wishlist' | 'friends' | 'groups'>('my-wishlist');
+    const [currentView, setCurrentView] = useState<'my-wishlist' | 'friends' | 'groups' | 'settings'>('my-wishlist');
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
     // Search & Filter state
     const [searchQuery, setSearchQuery] = useState('');
-    const [filterObtained, setFilterObtained] = useState<'all' | 'not_obtained' | 'obtained'>('all');
+    const [filterObtained, setFilterObtained] = useState<'all' | 'not_obtained' | 'obtained'>('not_obtained');
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'priority'>('newest');
 
     // Share state
@@ -97,11 +99,6 @@ export const Home: React.FC = () => {
         });
     };
 
-    const handleExport = () => {
-        if (items.length === 0) return alert('エクスポートするアイテムがありません。');
-        exportDataAsJsonFile(items);
-    };
-
     const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -119,10 +116,6 @@ export const Home: React.FC = () => {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const handleLogout = async () => {
-        await supabase.auth.signOut();
-    };
-
     // Filter & Sort logic
     const displayedItems = useMemo(() => {
         let result = [...items];
@@ -134,6 +127,11 @@ export const Home: React.FC = () => {
                 i.title.toLowerCase().includes(q) ||
                 (i.memo && i.memo.toLowerCase().includes(q))
             );
+        }
+
+        // Category Filter
+        if (selectedCategory !== 'all') {
+            result = result.filter(i => i.category === selectedCategory);
         }
 
         // Filter
@@ -163,7 +161,18 @@ export const Home: React.FC = () => {
         });
 
         return result;
-    }, [items, searchQuery, filterObtained, sortOrder]);
+    }, [items, searchQuery, selectedCategory, filterObtained, sortOrder]);
+
+    const totalSpent = useMemo(() => {
+        return items
+            .filter(i => i.obtained)
+            .reduce((sum, item) => sum + parsePriceString(item.price), 0);
+    }, [items]);
+
+    const categories = useMemo(() => {
+        const cats = items.map(i => i.category).filter((c): c is string => !!c && c.trim() !== '');
+        return ['all', ...Array.from(new Set(cats))];
+    }, [items]);
 
     if (currentView === 'friends') {
         return (
@@ -177,6 +186,14 @@ export const Home: React.FC = () => {
         return (
             <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
                 <GroupManager onBack={() => setCurrentView('my-wishlist')} />
+            </div>
+        );
+    }
+
+    if (currentView === 'settings') {
+        return (
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
+                <Settings onBack={() => setCurrentView('my-wishlist')} />
             </div>
         );
     }
@@ -228,14 +245,8 @@ export const Home: React.FC = () => {
                     {/* Auth Display Area */}
                     {!authLoading && user ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}>
-                            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <UserIcon size={14} />
-                                <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {user.email}
-                                </span>
-                            </span>
-                            <Button variant="ghost" size="sm" onClick={handleLogout} title="ログアウト">
-                                <LogOut size={16} />
+                            <Button variant="ghost" size="sm" onClick={() => setCurrentView('settings')} title="設定">
+                                <SettingsIcon size={20} />
                             </Button>
                         </div>
                     ) : (
@@ -248,7 +259,6 @@ export const Home: React.FC = () => {
                     <DropdownActionButtons
                         onShare={handleShareLink}
                         copySuccess={copySuccess}
-                        onExport={handleExport}
                         onImportClick={() => fileInputRef.current?.click()}
                     />
 
@@ -271,15 +281,8 @@ export const Home: React.FC = () => {
                     />
                 </div>
 
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
-                    <div className="input-wrapper" style={{ flex: '1 1 auto', minWidth: '120px' }}>
-                        <select className="input-field" value={filterObtained} onChange={e => setFilterObtained(e.target.value as any)}>
-                            <option value="all">すべて</option>
-                            <option value="not_obtained">未入手のみ</option>
-                            <option value="obtained">入手済みのみ</option>
-                        </select>
-                    </div>
-                    <div className="input-wrapper" style={{ flex: '1 1 auto', minWidth: '120px' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div className="input-wrapper" style={{ minWidth: '120px' }}>
                         <select className="input-field" value={sortOrder} onChange={e => setSortOrder(e.target.value as any)}>
                             <option value="newest">新しい順</option>
                             <option value="oldest">古い順</option>
@@ -289,25 +292,150 @@ export const Home: React.FC = () => {
                 </div>
             </div>
 
-            {/* Items Grid */}
-            {displayedItems.length > 0 ? (
+            {/* Main Tabs (Not Obtained / Obtained) */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--glass-border)' }}>
+                <button
+                    onClick={() => setFilterObtained('not_obtained')}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        fontSize: '1rem',
+                        fontWeight: filterObtained === 'not_obtained' ? 600 : 400,
+                        color: filterObtained === 'not_obtained' ? 'var(--primary)' : 'var(--text-secondary)',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: filterObtained === 'not_obtained' ? '2px solid var(--primary)' : '2px solid transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        marginBottom: '-1px'
+                    }}
+                >
+                    欲しいもの
+                </button>
+                <button
+                    onClick={() => setFilterObtained('obtained')}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        fontSize: '1rem',
+                        fontWeight: filterObtained === 'obtained' ? 600 : 400,
+                        color: filterObtained === 'obtained' ? 'var(--primary)' : 'var(--text-secondary)',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: filterObtained === 'obtained' ? '2px solid var(--primary)' : '2px solid transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        marginBottom: '-1px'
+                    }}
+                >
+                    入手済み（履歴）
+                </button>
+            </div>
+
+            {filterObtained === 'obtained' && totalSpent > 0 && (
+                <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>入手済みの総支出額:</span>
+                    <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '0.02em' }}>
+                        ¥{totalSpent.toLocaleString()}
+                    </span>
+                </div>
+            )}
+
+            {/* Category Filter Pills */}
+            {categories.length > 1 && (
                 <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: '1rem'
-                }}>
-                    {displayedItems.map(item => (
-                        <ItemCard
-                            key={item.id}
-                            item={item}
-                            onToggleObtained={handleToggleObtained}
-                            onClick={(item) => {
-                                setEditingItem(item);
-                                setIsFormOpen(true);
+                    display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem', marginBottom: '1.5rem',
+                    scrollbarWidth: 'none', msOverflowStyle: 'none'
+                }} className="hide-scroll">
+                    {categories.map(cat => (
+                        <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            style={{
+                                padding: '0.4rem 1.2rem',
+                                borderRadius: '99px',
+                                background: selectedCategory === cat ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
+                                color: selectedCategory === cat ? 'white' : 'var(--text-secondary)',
+                                border: '1px solid ' + (selectedCategory === cat ? 'var(--primary)' : 'var(--glass-border)'),
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                fontSize: '0.875rem',
+                                transition: 'all 0.2s ease',
+                                fontWeight: selectedCategory === cat ? 600 : 400
                             }}
-                        />
+                        >
+                            {cat === 'all' ? 'すべて' : cat}
+                        </button>
                     ))}
                 </div>
+            )}
+
+            {/* Items Grid */}
+            {displayedItems.length > 0 ? (
+                filterObtained === 'obtained' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+                        {(() => {
+                            const grouped = displayedItems.reduce((acc, item) => {
+                                const date = new Date(item.obtainedAt || item.createdAt);
+                                const monthKey = `${date.getFullYear()}年${String(date.getMonth() + 1).padStart(2, '0')}月`;
+                                if (!acc[monthKey]) acc[monthKey] = [];
+                                acc[monthKey].push(item);
+                                return acc;
+                            }, {} as Record<string, typeof displayedItems>);
+
+                            return Object.keys(grouped)
+                                .sort((a, b) => b.localeCompare(a)) // Descending order of months
+                                .map(month => {
+                                    const itemsInMonth = grouped[month];
+                                    const monthTotal = itemsInMonth.reduce((sum, item) => sum + parsePriceString(item.price), 0);
+
+                                    return (
+                                        <div key={month}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>
+                                                <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)' }}>{month}</h2>
+                                                <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)', letterSpacing: '0.02em' }}>
+                                                    ¥{monthTotal.toLocaleString()}
+                                                </div>
+                                            </div>
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                                gap: '1rem'
+                                            }}>
+                                                {itemsInMonth.map(item => (
+                                                    <ItemCard
+                                                        key={item.id}
+                                                        item={item}
+                                                        onToggleObtained={handleToggleObtained}
+                                                        onClick={(item) => {
+                                                            setEditingItem(item);
+                                                            setIsFormOpen(true);
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                });
+                        })()}
+                    </div>
+                ) : (
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gap: '1rem'
+                    }}>
+                        {displayedItems.map(item => (
+                            <ItemCard
+                                key={item.id}
+                                item={item}
+                                onToggleObtained={handleToggleObtained}
+                                onClick={(item) => {
+                                    setEditingItem(item);
+                                    setIsFormOpen(true);
+                                }}
+                            />
+                        ))}
+                    </div>
+                )
             ) : (
                 <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)' }}>
                     <p style={{ fontSize: '1.125rem' }}>アイテムが見つかりません</p>
@@ -339,11 +467,10 @@ export const Home: React.FC = () => {
 interface DropdownActionButtonsProps {
     onShare: () => void;
     copySuccess: boolean;
-    onExport: () => void;
     onImportClick: () => void;
 }
 
-const DropdownActionButtons: React.FC<DropdownActionButtonsProps> = ({ onShare, copySuccess, onExport, onImportClick }) => {
+const DropdownActionButtons: React.FC<DropdownActionButtonsProps> = ({ onShare, copySuccess, onImportClick }) => {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
@@ -365,9 +492,6 @@ const DropdownActionButtons: React.FC<DropdownActionButtonsProps> = ({ onShare, 
                 }}>
                     <button className="btn btn-ghost" style={{ padding: '0.75rem 1rem', justifyContent: 'flex-start' }} onClick={() => { onShare(); setIsOpen(false); }}>
                         {copySuccess ? <Check size={16} /> : <Share2 size={16} />} {copySuccess ? 'コピー済' : 'リンク共有'}
-                    </button>
-                    <button className="btn btn-ghost" style={{ padding: '0.75rem 1rem', justifyContent: 'flex-start' }} onClick={() => { onExport(); setIsOpen(false); }}>
-                        <Download size={16} /> エクスポート
                     </button>
                     <button className="btn btn-ghost" style={{ padding: '0.75rem 1rem', justifyContent: 'flex-start' }} onClick={() => { onImportClick(); setIsOpen(false); }}>
                         <Upload size={16} /> インポート
