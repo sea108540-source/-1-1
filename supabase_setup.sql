@@ -134,11 +134,15 @@ CREATE TABLE IF NOT EXISTS public.items (
   obtained_at bigint
 );
 
--- Add group_id to existing table safely if it exists
+-- Add group_id and reserved_by to existing table safely if it exists
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='items' AND column_name='group_id') THEN
     ALTER TABLE public.items ADD COLUMN group_id uuid REFERENCES public.groups ON DELETE CASCADE;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='items' AND column_name='reserved_by') THEN
+    ALTER TABLE public.items ADD COLUMN reserved_by uuid REFERENCES auth.users ON DELETE SET NULL;
   END IF;
 END $$;
 
@@ -187,6 +191,13 @@ CREATE POLICY "Users can update their own items or group items" ON public.items 
       SELECT 1 FROM public.group_members
       WHERE user_id = auth.uid() AND group_id = public.items.group_id
     )
+  ) OR
+  EXISTS (
+    SELECT 1 FROM public.friendships
+    WHERE (
+      (user_id = auth.uid() AND friend_id = public.items.user_id) OR
+      (friend_id = auth.uid() AND user_id = public.items.user_id)
+    ) AND status = 'accepted'
   )
 );
 

@@ -55,6 +55,7 @@ const mapToDbItem = (item: Item, userId: string) => ({
   obtained_at: item.obtainedAt || null,
   group_id: item.group_id || null,
   is_public: item.is_public ?? true,
+  reserved_by: item.reserved_by || null,
 });
 
 const mapFromDbItem = (row: any): Item => ({
@@ -73,6 +74,9 @@ const mapFromDbItem = (row: any): Item => ({
   is_public: row.is_public ?? true,
   creator: row.profiles || undefined,
   group: row.groups || undefined,
+  reserved_by: row.reserved_by || undefined,
+  // Join aliased to reserver or mapped from reserved_by manually if populated
+  reserver: row.reserver || undefined,
 });
 
 // ========================
@@ -84,7 +88,7 @@ export const getItems = async (): Promise<Item[]> => {
   if (session?.user) {
     const { data, error } = await supabase
       .from('items')
-      .select('*, groups(id, name)')
+      .select('*, groups(id, name), profiles!items_user_id_fkey(id, display_name, username, avatar_url), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
     if (error) { console.error('Supabase fetch error:', error); return []; }
@@ -97,7 +101,7 @@ export const getItems = async (): Promise<Item[]> => {
 export const getItemById = async (id: string): Promise<Item | undefined> => {
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.user) {
-    const { data, error } = await supabase.from('items').select('*').eq('id', id).single();
+    const { data, error } = await supabase.from('items').select('*, groups(id, name), profiles!items_user_id_fkey(id, display_name, username, avatar_url), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)').eq('id', id).single();
     if (error || !data) return undefined;
     return mapFromDbItem(data);
   }
@@ -165,6 +169,31 @@ export const addMultipleItems = async (items: Item[]): Promise<void> => {
     tx.store.add(item);
   }
   await tx.done;
+  await tx.done;
+};
+
+export const reserveItem = async (itemId: string): Promise<void> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not logged in");
+
+  const { error } = await supabase
+    .from('items')
+    .update({ reserved_by: session.user.id })
+    .eq('id', itemId);
+
+  if (error) throw error;
+};
+
+export const cancelReservation = async (itemId: string): Promise<void> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not logged in");
+
+  const { error } = await supabase
+    .from('items')
+    .update({ reserved_by: null })
+    .eq('id', itemId);
+
+  if (error) throw error;
 };
 
 // ========================
@@ -237,7 +266,11 @@ export const getFriends = async (): Promise<Profile[]> => {
   if (!friendships || friendships.length === 0) return [];
 
   // The friend's ID is the one that is not our ID
-  const friendIds = friendships.map(f => f.user_id === session.user.id ? f.friend_id : f.user_id);
+  // Use Set to deduplicate (RLS now returns rows from both directions)
+  const friendIdSet = new Set(
+    friendships.map(f => f.user_id === session.user.id ? f.friend_id : f.user_id)
+  );
+  const friendIds = Array.from(friendIdSet);
 
   // Fetch profiles
   const { data: profiles, error: profileError } = await supabase
@@ -251,9 +284,20 @@ export const getFriends = async (): Promise<Profile[]> => {
   }
 
   const profileMap = new Map((profiles || []).map(p => [p.id, p]));
-  const orderedProfiles = friendIds.map(id => profileMap.get(id)).filter(Boolean) as Profile[];
+  const uniqueFriends: Profile[] = [];
+  const seenIds = new Set<string>();
 
-  return orderedProfiles;
+  for (const id of friendIds) {
+    if (id && !seenIds.has(id)) {
+      const p = profileMap.get(id);
+      if (p) {
+        uniqueFriends.push(p);
+        seenIds.add(id);
+      }
+    }
+  }
+
+  return uniqueFriends;
 };
 
 export const getFriendRequests = async (): Promise<FriendRequest[]> => {
@@ -307,7 +351,7 @@ export const removeFriend = async (friendId: string) => {
 export const getFriendItems = async (friendId: string): Promise<Item[]> => {
   const { data, error } = await supabase
     .from('items')
-    .select('*')
+    .select('*, groups(id, name), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)')
     .eq('user_id', friendId)
     .order('created_at', { ascending: false });
 
@@ -354,10 +398,25 @@ export const getGroups = async (): Promise<Group[]> => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) return [];
 
+  // First get the group IDs the user belongs to
+  const { data: memberRows, error: memberError } = await supabase
+    .from('group_members')
+    .select('group_id')
+    .eq('user_id', session.user.id);
+
+  if (memberError) {
+    console.error('Error fetching group memberships:', memberError);
+    return [];
+  }
+
+  if (!memberRows || memberRows.length === 0) return [];
+
+  const groupIds = memberRows.map((r: any) => r.group_id);
+
   const { data, error } = await supabase
     .from('groups')
-    .select('*, group_members!inner(user_id)')
-    .eq('group_members.user_id', session.user.id)
+    .select('*')
+    .in('id', groupIds)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -365,7 +424,6 @@ export const getGroups = async (): Promise<Group[]> => {
     return [];
   }
 
-  // Remove the joined data from the type to match Group type
   return data.map((g: any) => ({
     id: g.id,
     name: g.name,
@@ -412,13 +470,15 @@ export const getGroupItems = async (groupId: string): Promise<Item[]> => {
     return [];
   }
 
-  // 2. Fetch profiles for the unique user_ids in the items
+  // 2. Fetch profiles for the unique user_ids and reserved_by ids in the items
   const userIds = Array.from(new Set(data.map(item => item.user_id).filter(Boolean)));
+  const reserverIds = Array.from(new Set(data.map(item => item.reserved_by).filter(Boolean)));
+  const allProfileIds = Array.from(new Set([...userIds, ...reserverIds]));
 
   const { data: profiles, error: profileError } = await supabase
     .from('profiles')
     .select('*')
-    .in('id', userIds);
+    .in('id', allProfileIds);
 
   if (profileError) {
     console.error('Error fetching group item profiles:', profileError);
@@ -426,9 +486,10 @@ export const getGroupItems = async (groupId: string): Promise<Item[]> => {
 
   const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
-  // 3. Map manually, attaching the creator profile
+  // 3. Map manually, attaching the creator profile and reserver profile
   return data.map(row => mapFromDbItem({
     ...row,
-    profiles: profileMap.get(row.user_id) || undefined
+    profiles: profileMap.get(row.user_id) || undefined,
+    reserver: profileMap.get(row.reserved_by) || undefined
   }));
 };

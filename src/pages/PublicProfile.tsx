@@ -5,6 +5,7 @@ import { ItemCard } from '../components/ItemCard';
 import { Cake, ArrowLeft, UserPlus, LogIn, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
+import { reserveItem, cancelReservation } from '../lib/db';
 
 interface PublicProfileProps {
     username: string;
@@ -19,6 +20,15 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
     const [friendStatus, setFriendStatus] = useState<'none' | 'pending' | 'friends'>('none');
     const [requesting, setRequesting] = useState(false);
 
+    const reloadItems = async (userId: string) => {
+        try {
+            const userItems = await getFriendItems(userId);
+            setItems(userItems);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     useEffect(() => {
         const fetchProfile = async () => {
             if (!username) return;
@@ -27,8 +37,7 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
                 const p = await searchUserByUsername(username);
                 if (p) {
                     setProfile(p);
-                    const userItems = await getFriendItems(p.id);
-                    setItems(userItems);
+                    await reloadItems(p.id);
 
                     // Check friend status if logged in
                     if (user && user.id !== p.id) {
@@ -62,6 +71,26 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
 
         fetchProfile();
     }, [username, user]);
+
+    const handleReserve = async (id: string) => {
+        try {
+            await reserveItem(id);
+            if (profile) await reloadItems(profile.id);
+        } catch (err) {
+            console.error(err);
+            alert('予約に失敗しました。');
+        }
+    };
+
+    const handleCancelReservation = async (id: string) => {
+        try {
+            await cancelReservation(id);
+            if (profile) await reloadItems(profile.id);
+        } catch (err) {
+            console.error(err);
+            alert('予約のキャンセルに失敗しました。');
+        }
+    };
 
     const handleSendRequest = async () => {
         if (!profile || !user) return;
@@ -285,7 +314,10 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
                         <ItemCard
                             key={item.id}
                             item={item}
+                            currentUserId={user?.id}
                             onToggleObtained={() => { }} // 公開ページからは変更不可
+                            onReserve={handleReserve}
+                            onCancelReservation={handleCancelReservation}
                             onClick={() => { }}
                         />
                     ))}

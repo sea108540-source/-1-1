@@ -406,6 +406,9 @@ export const Home: React.FC = () => {
                                                     <ItemCard
                                                         key={item.id}
                                                         item={item}
+                                                        currentUserId={user?.id}
+                                                        onReserve={async () => { }}
+                                                        onCancelReservation={async () => { }}
                                                         onToggleObtained={handleToggleObtained}
                                                         onClick={(item) => {
                                                             setEditingItem(item);
@@ -429,6 +432,9 @@ export const Home: React.FC = () => {
                             <ItemCard
                                 key={item.id}
                                 item={item}
+                                currentUserId={user?.id}
+                                onReserve={async () => { }}
+                                onCancelReservation={async () => { }}
                                 onToggleObtained={handleToggleObtained}
                                 onClick={(item) => {
                                     setEditingItem(item);

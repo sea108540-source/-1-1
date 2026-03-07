@@ -6,11 +6,14 @@ import { format } from 'date-fns';
 
 interface ItemCardProps {
     item: Item;
+    currentUserId?: string; // To check if current user is the creator or reserver
     onToggleObtained: (id: string, currentStatus: boolean) => void;
     onClick: (item: Item) => void;
+    onReserve?: (id: string) => void;
+    onCancelReservation?: (id: string) => void;
 }
 
-export const ItemCard: React.FC<ItemCardProps> = ({ item, onToggleObtained, onClick }) => {
+export const ItemCard: React.FC<ItemCardProps> = ({ item, currentUserId, onToggleObtained, onClick, onReserve, onCancelReservation }) => {
 
     const getPriorityBadge = (priority?: string) => {
         switch (priority) {
@@ -21,9 +24,14 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onToggleObtained, onCl
         }
     };
 
+    const isCreator = currentUserId === item.creator?.id;
+    const isReserved = !!item.reserved_by;
+    const isReservedByMe = isReserved && item.reserved_by === currentUserId;
+    const isOtherReserved = isReserved && !isReservedByMe;
+
     return (
         <div
-            className={`glass-panel item-card ${item.obtained ? 'item-obtained' : ''}`}
+            className={`glass-panel item-card ${item.obtained ? 'item-obtained' : ''} ${isOtherReserved && !isCreator ? 'item-reserved' : ''}`}
             onClick={() => onClick(item)}
             style={{ cursor: 'pointer', padding: '1rem', transition: 'transform 0.2s', position: 'relative' }}
         >
@@ -54,6 +62,16 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onToggleObtained, onCl
                             {item.title || '無題のアイテム'}
                         </h3>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            {/* 自分が見ているときには予約状態を隠す (isCreator) */}
+                            {!isCreator && isReserved && (
+                                <span style={{
+                                    fontSize: '0.75rem', fontWeight: 'bold', padding: '2px 8px', borderRadius: '12px',
+                                    backgroundColor: isReservedByMe ? 'var(--primary)' : 'rgba(255,255,255,0.1)',
+                                    color: isReservedByMe ? 'white' : 'var(--text-secondary)'
+                                }}>
+                                    {isReservedByMe ? 'あなたが予約中' : `${item.reserver?.display_name || item.reserver?.username || '他メンバー'}が予約済`}
+                                </span>
+                            )}
                             {item.is_public === false && (
                                 <span title="非公開" style={{ color: 'var(--text-muted)' }}>
                                     <Lock size={16} />
@@ -104,17 +122,44 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onToggleObtained, onCl
                         ) : <div />}
 
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
-                            <button
-                                className={`btn btn-sm ${item.obtained ? 'btn-ghost' : 'btn-secondary'}`}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onToggleObtained(item.id, item.obtained);
-                                }}
-                                style={{ padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                            >
-                                <CheckCircle2 size={16} color={item.obtained ? 'var(--success)' : 'inherit'} />
-                                {item.obtained ? '入手済み' : '未入手'}
-                            </button>
+                            {/* 予約アクション領域 (本人は見えない) */}
+                            {!isCreator && !item.obtained && (
+                                <div style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.25rem' }}>
+                                    {!isReserved && onReserve && (
+                                        <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); onReserve(item.id); }}>
+                                            購入を予約
+                                        </button>
+                                    )}
+                                    {isReservedByMe && onCancelReservation && (
+                                        <button className="btn btn-sm btn-ghost" onClick={(e) => { e.stopPropagation(); onCancelReservation(item.id); }} style={{ color: 'var(--danger)' }}>
+                                            予約取消
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* 入手済みトグルボタン: 
+                                自分が作成者(isCreator) なら常に操作可能。
+                                自分が予約者(isReservedByMe) なら操作可能。
+                                それ以外(予約されていない他人のアイテム、他人が予約中のアイテム等)は「入手済みにする」操作はできない(もしくは表示だけ)
+                            */}
+                            {(isCreator || isReservedByMe || item.obtained) && (
+                                <button
+                                    className={`btn btn-sm ${item.obtained ? 'btn-ghost' : 'btn-secondary'}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        // 他人のアイテムで予約もしていないのに押せないようにする（念のため）
+                                        if (isCreator || isReservedByMe) {
+                                            onToggleObtained(item.id, item.obtained);
+                                        }
+                                    }}
+                                    disabled={!isCreator && !isReservedByMe}
+                                    style={{ padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: (!isCreator && !isReservedByMe && !item.obtained) ? 0.5 : 1 }}
+                                >
+                                    <CheckCircle2 size={16} color={item.obtained ? 'var(--success)' : 'inherit'} />
+                                    {item.obtained ? '入手済み' : (isReservedByMe ? 'プレゼントした' : '未入手')}
+                                </button>
+                            )}
                             {item.obtained && item.obtainedAt && (
                                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                     <Clock size={10} />

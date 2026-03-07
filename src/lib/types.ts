@@ -17,6 +17,8 @@ export type Item = {
     is_public?: boolean;
     creator?: Profile;
     group?: { id: string; name: string };
+    reserved_by?: string | null;
+    reserver?: Profile;
 };
 
 export type Profile = {

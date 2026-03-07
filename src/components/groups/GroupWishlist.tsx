@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/Button';
-import { getGroupItems, addItem, updateItem, deleteItem } from '../../lib/db';
+import { getGroupItems, addItem, updateItem, deleteItem, reserveItem, cancelReservation } from '../../lib/db';
 import type { Item, Group } from '../../lib/types';
+import { useAuth } from '../../contexts/AuthContext';
 import { ItemCard } from '../ItemCard';
 import { ItemForm } from '../ItemForm';
 import { ArrowLeft, Plus } from 'lucide-react';
@@ -12,6 +13,7 @@ interface GroupWishlistProps {
 }
 
 export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) => {
+    const { user } = useAuth();
     const [items, setItems] = useState<Item[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -56,6 +58,26 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
         }
     };
 
+    const handleReserve = async (id: string) => {
+        try {
+            await reserveItem(id);
+            await loadItems();
+        } catch (err) {
+            console.error(err);
+            alert('予約に失敗しました。');
+        }
+    };
+
+    const handleCancelReservation = async (id: string) => {
+        try {
+            await cancelReservation(id);
+            await loadItems();
+        } catch (err) {
+            console.error(err);
+            alert('予約のキャンセルに失敗しました。');
+        }
+    };
+
     return (
         <div className="glass-panel" style={{ padding: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
@@ -79,8 +101,13 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
                         <ItemCard
                             key={item.id}
                             item={item}
+                            currentUserId={user?.id}
                             onToggleObtained={handleToggleObtained}
+                            onReserve={handleReserve}
+                            onCancelReservation={handleCancelReservation}
                             onClick={(item) => {
+                                // 自分のアイテム以外は編集フォームを開かせない (閲覧のみとする)
+                                if (item.creator?.id !== user?.id) return;
                                 setEditingItem(item);
                                 setIsFormOpen(true);
                             }}
