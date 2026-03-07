@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { searchUserByUsername, getFriendItems } from '../lib/db';
 import type { Profile, Item } from '../lib/types';
 import { ItemCard } from '../components/ItemCard';
-import { Cake, ArrowLeft } from 'lucide-react';
+import { Cake, ArrowLeft, UserPlus, LogIn, Check } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/ui/Button';
 
 interface PublicProfileProps {
     username: string;
@@ -13,6 +15,9 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
     const [items, setItems] = useState<Item[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterObtained, setFilterObtained] = useState<'unobtained' | 'obtained'>('unobtained');
+    const { user } = useAuth();
+    const [friendStatus, setFriendStatus] = useState<'none' | 'pending' | 'friends'>('none');
+    const [requesting, setRequesting] = useState(false);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -24,6 +29,29 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
                     setProfile(p);
                     const userItems = await getFriendItems(p.id);
                     setItems(userItems);
+
+                    // Check friend status if logged in
+                    if (user && user.id !== p.id) {
+                        try {
+                            const { getFriends } = await import('../lib/db');
+                            const friendsList = await getFriends();
+                            if (friendsList.find(f => f.id === p.id)) {
+                                setFriendStatus('friends');
+                            } else {
+                                // check pending
+                                const { supabase } = await import('../lib/supabase');
+                                const { data: existing } = await supabase
+                                    .from('friendships')
+                                    .select('status')
+                                    .eq('user_id', user.id)
+                                    .eq('friend_id', p.id)
+                                    .single();
+                                if (existing && existing.status === 'pending') {
+                                    setFriendStatus('pending');
+                                }
+                            }
+                        } catch (e) { console.error('Error checking friend status', e); }
+                    }
                 }
             } catch (err) {
                 console.error('Failed to load profile', err);
@@ -33,7 +61,22 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
         };
 
         fetchProfile();
-    }, [username]);
+    }, [username, user]);
+
+    const handleSendRequest = async () => {
+        if (!profile || !user) return;
+        setRequesting(true);
+        try {
+            const { addFriend } = await import('../lib/db');
+            await addFriend(profile.id);
+            alert('友達リクエストを送信しました！');
+            setFriendStatus('pending');
+        } catch (err: any) {
+            alert('リクエストの送信に失敗しました:\n' + (err.message || '既に追加されている可能性があります。'));
+        } finally {
+            setRequesting(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -159,6 +202,29 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
                                 </div>
                             );
                         })()}
+
+                        {/* Friend Action Section */}
+                        <div style={{ marginTop: '1rem' }}>
+                            {!user ? (
+                                <Button variant="secondary" size="sm" icon={<LogIn size={16} />} onClick={() => window.location.href = '/'}>
+                                    ログインして友達になる
+                                </Button>
+                            ) : user.id === profile.id ? (
+                                <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.75rem', borderRadius: 'var(--radius-full)' }}>あなた自身のプロフィールです</span>
+                            ) : friendStatus === 'friends' ? (
+                                <Button variant="ghost" size="sm" icon={<Check size={16} color="var(--primary)" />} disabled>
+                                    友達です
+                                </Button>
+                            ) : friendStatus === 'pending' ? (
+                                <Button variant="secondary" size="sm" disabled>
+                                    リクエスト送信済み
+                                </Button>
+                            ) : (
+                                <Button variant="primary" size="sm" icon={<UserPlus size={16} />} onClick={handleSendRequest} disabled={requesting}>
+                                    {requesting ? '送信中...' : '友達リクエストを送る'}
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

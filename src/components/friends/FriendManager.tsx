@@ -3,7 +3,8 @@ import { getFriends, addFriend, searchUserByUsername, getFriendItems, getProfile
 import type { Profile, Item } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { UserPlus, Users, ArrowLeft, Search, User as UserIcon, Cake, Check, X } from 'lucide-react';
+import { UserPlus, Users, ArrowLeft, Search, User as UserIcon, Cake, Check, X, QrCode, Download } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ItemCard } from '../ItemCard';
 
@@ -23,6 +24,7 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
     const [myProfile, setMyProfile] = useState<Profile | null>(null);
     const [isSettingId, setIsSettingId] = useState(false);
     const [newUsername, setNewUsername] = useState('');
+    const [showQRModal, setShowQRModal] = useState(false);
 
     useEffect(() => {
         loadFriends();
@@ -105,6 +107,18 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
             console.error('Profile update failed:', err);
             alert(`エラーが発生しました: ${err.message || '不明なエラー'}\n(このIDは既に使われている可能性があります)`);
         }
+    };
+
+    const handleDownloadQR = () => {
+        const canvas = document.getElementById('my-qr-code') as HTMLCanvasElement;
+        if (!canvas) return;
+        const pngUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+        let downloadLink = document.createElement("a");
+        downloadLink.href = pngUrl;
+        downloadLink.download = `qr_${myProfile?.username || 'user'}.png`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
     };
 
 
@@ -223,8 +237,9 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                     <div>
                         <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem' }}>自分のマイID</h3>
                         {myProfile?.username ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>@{myProfile.username}</span>
+                                <Button variant="secondary" size="sm" icon={<QrCode size={16} />} onClick={() => setShowQRModal(true)}>QRコード</Button>
                                 <Button variant="ghost" size="sm" onClick={() => setIsSettingId(true)}>変更</Button>
                             </div>
                         ) : (
@@ -248,6 +263,56 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                     </div>
                 )}
             </div>
+
+            {/* QR Modal */}
+            {showQRModal && myProfile?.username && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 100, padding: '1rem'
+                }} onClick={() => setShowQRModal(false)}>
+                    <div style={{
+                        background: 'var(--bg-card)',
+                        padding: '2rem',
+                        borderRadius: 'var(--radius-lg)',
+                        textAlign: 'center',
+                        maxWidth: '350px',
+                        width: '100%',
+                        border: '1px solid var(--glass-border)',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                    }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem', color: 'var(--text-primary)' }}>あなたのQRコード</h3>
+                        <div style={{
+                            background: 'white',
+                            padding: '1rem',
+                            borderRadius: 'var(--radius-md)',
+                            display: 'inline-block',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <QRCodeCanvas
+                                id="my-qr-code"
+                                value={`${window.location.origin}/p/${myProfile.username}`}
+                                size={200}
+                                level="H"
+                                fgColor="#000000"
+                                bgColor="#ffffff"
+                            />
+                        </div>
+                        <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                            このQRコードを読み取ってもらうと、<br />すぐに友達の申請ができます。
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <Button variant="primary" icon={<Download size={18} />} onClick={handleDownloadQR}>
+                                画像として保存
+                            </Button>
+                            <Button variant="ghost" onClick={() => setShowQRModal(false)}>
+                                閉じる
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Friend Requests */}
             {requests.length > 0 && (
