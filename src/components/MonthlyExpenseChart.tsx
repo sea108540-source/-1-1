@@ -205,9 +205,9 @@ export const MonthlyExpenseChart: React.FC<MonthlyExpenseChartProps> = ({ items 
                         outline: 'none'
                     }}
                 >
-                    <option value="all" style={{ background: '#1a1a1a' }}>全期間</option>
+                    <option value="all">全期間</option>
                     {availableMonths.map(month => (
-                        <option key={month} value={month} style={{ background: '#1a1a1a' }}>
+                        <option key={month} value={month}>
                             {month}
                         </option>
                     ))}
