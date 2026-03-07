@@ -186,3 +186,8 @@ CREATE POLICY "Users can delete their own items or group items" ON public.items 
     )
   )
 );
+
+-- Public items can be viewed by anyone (for sharing profile via URL)
+DROP POLICY IF EXISTS "Public items are viewable by everyone" ON public.items;
+CREATE POLICY "Public items are viewable by everyone" ON public.items FOR SELECT USING (true);
+

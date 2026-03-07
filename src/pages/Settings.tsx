@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { ArrowLeft, User as UserIcon, LogOut, Download, Plus } from 'lucide-react';
+import { ArrowLeft, User as UserIcon, LogOut, Download, Plus, Copy } from 'lucide-react';
 import { exportDataAsJsonFile } from '../lib/shareUtils';
 import { getItems } from '../lib/db';
 
@@ -264,6 +264,37 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     <Button variant="primary" onClick={handleSaveProfile} disabled={saving}>
                         {saving ? '保存中...' : 'プロフィールを保存'}
                     </Button>
+                </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>共有設定</h2>
+                <div style={{ padding: '1.5rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
+                    <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: 'var(--text-primary)' }}>SNSでシェアする</h3>
+                    <p style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        以下のURLを共有すると、あなたの「欲しいものリスト」と「入手済みアイテム」を公開できます。<br />
+                        （未ログインのユーザーでも表示可能です）
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                            type="text"
+                            readOnly
+                            value={`${window.location.origin}/p/${username || user?.id?.substring(0, 8)}`}
+                            className="input-field"
+                            style={{ flex: 1, color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.5)' }}
+                            onClick={(e) => e.currentTarget.select()}
+                        />
+                        <Button
+                            variant="primary"
+                            onClick={async () => {
+                                const url = `${window.location.origin}/p/${username || user?.id?.substring(0, 8)}`;
+                                await navigator.clipboard.writeText(url);
+                                alert('クリップボードにコピーしました！');
+                            }}
+                        >
+                            <Copy size={16} /> コピー
+                        </Button>
+                    </div>
                 </div>
             </div>
 
