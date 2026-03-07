@@ -25,6 +25,7 @@ export type Profile = {
     username: string | null;
     avatar_url: string | null;
     bio?: string | null;
+    birthday?: string | null;
     updated_at?: string;
 };
 

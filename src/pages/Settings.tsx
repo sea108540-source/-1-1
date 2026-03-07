@@ -17,6 +17,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const [displayName, setDisplayName] = useState('');
     const [username, setUsername] = useState('');
     const [bio, setBio] = useState('');
+    const [birthday, setBirthday] = useState('');
     const [avatarUrl, setAvatarUrl] = useState('');
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 setDisplayName(data.display_name || '');
                 setUsername(data.username || '');
                 setBio(data.bio || '');
+                setBirthday(data.birthday || '');
                 setAvatarUrl(data.avatar_url || '');
             } catch (error) {
                 console.error('Error fetching profile:', error);
@@ -92,6 +94,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 display_name: displayName,
                 username,
                 bio,
+                birthday: birthday || null,
                 avatar_url: finalAvatarUrl,
                 updated_at: new Date().toISOString(),
             };
@@ -228,6 +231,20 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                         value={bio}
                         onChange={e => setBio(e.target.value)}
                         style={{ minHeight: '100px', resize: 'vertical', paddingTop: '0.75rem' }}
+                    />
+                </div>
+
+                <div className="input-wrapper">
+                    <label className="input-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>誕生日 (Birthday)</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>友達に公開されます</span>
+                    </label>
+                    <input
+                        type="date"
+                        className="input-field"
+                        value={birthday}
+                        onChange={e => setBirthday(e.target.value)}
+                        style={{ colorScheme: 'dark' }}
                     />
                 </div>
 

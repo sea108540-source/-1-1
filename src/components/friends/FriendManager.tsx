@@ -3,7 +3,7 @@ import { getFriends, addFriend, searchUserByUsername, getFriendItems, getProfile
 import type { Profile, Item } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { UserPlus, Users, ArrowLeft, Search, User as UserIcon } from 'lucide-react';
+import { UserPlus, Users, ArrowLeft, Search, User as UserIcon, Cake } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ItemCard } from '../ItemCard';
 
@@ -139,10 +139,28 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                                 @{selectedFriend.username}
                             </p>
                             {selectedFriend.bio && (
-                                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                                     {selectedFriend.bio}
                                 </p>
                             )}
+                            {selectedFriend.birthday && (() => {
+                                const bd = new Date(selectedFriend.birthday);
+                                const today = new Date();
+                                const month = bd.getMonth() + 1;
+                                const day = bd.getDate();
+                                const age = today.getFullYear() - bd.getFullYear() -
+                                    (today.getMonth() < bd.getMonth() || (today.getMonth() === bd.getMonth() && today.getDate() < bd.getDate()) ? 1 : 0);
+                                const isToday = today.getMonth() === bd.getMonth() && today.getDate() === bd.getDate();
+                                return (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                                        <Cake size={14} />
+                                        <span>
+                                            {month}月{day}日 ({age}歳)
+                                            {isToday && <span style={{ marginLeft: '0.5rem', color: '#f59e0b', fontWeight: 700 }}>🎉 今日が誕生日！</span>}
+                                        </span>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>
