@@ -148,14 +148,12 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                                 const today = new Date();
                                 const month = bd.getMonth() + 1;
                                 const day = bd.getDate();
-                                const age = today.getFullYear() - bd.getFullYear() -
-                                    (today.getMonth() < bd.getMonth() || (today.getMonth() === bd.getMonth() && today.getDate() < bd.getDate()) ? 1 : 0);
                                 const isToday = today.getMonth() === bd.getMonth() && today.getDate() === bd.getDate();
                                 return (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
                                         <Cake size={14} />
                                         <span>
-                                            {month}月{day}日 ({age}歳)
+                                            {month}月{day}日
                                             {isToday && <span style={{ marginLeft: '0.5rem', color: '#f59e0b', fontWeight: 700 }}>🎉 今日が誕生日！</span>}
                                         </span>
                                     </div>
