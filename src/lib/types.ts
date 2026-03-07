@@ -24,6 +24,7 @@ export type Profile = {
     display_name: string | null;
     username: string | null;
     avatar_url: string | null;
+    bio?: string | null;
     updated_at?: string;
 };
 

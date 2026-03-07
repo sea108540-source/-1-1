@@ -16,6 +16,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const { user } = useAuth();
     const [displayName, setDisplayName] = useState('');
     const [username, setUsername] = useState('');
+    const [bio, setBio] = useState('');
     const [avatarUrl, setAvatarUrl] = useState('');
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -38,6 +39,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 if (error) throw error;
                 setDisplayName(data.display_name || '');
                 setUsername(data.username || '');
+                setBio(data.bio || '');
                 setAvatarUrl(data.avatar_url || '');
             } catch (error) {
                 console.error('Error fetching profile:', error);
@@ -89,6 +91,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 id: user.id,
                 display_name: displayName,
                 username,
+                bio,
                 avatar_url: finalAvatarUrl,
                 updated_at: new Date().toISOString(),
             };
@@ -215,6 +218,17 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                             style={{ flex: 1, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, paddingLeft: '0.5rem' }}
                         />
                     </div>
+                </div>
+
+                <div className="input-wrapper">
+                    <label className="input-label">自己紹介 (Bio)</label>
+                    <textarea
+                        className="input-field"
+                        placeholder="自分について書きましょう..."
+                        value={bio}
+                        onChange={e => setBio(e.target.value)}
+                        style={{ minHeight: '100px', resize: 'vertical', paddingTop: '0.75rem' }}
+                    />
                 </div>
 
                 {message && (

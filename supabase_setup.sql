@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   display_name text,
   username text UNIQUE,
   avatar_url text,
+  bio text,
   updated_at timestamp with time zone DEFAULT now()
 );
 

@@ -89,10 +89,16 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
     if (selectedFriend) {
         return (
             <div className="friend-wishlist-view">
-                <header style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+                <header style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                     <Button variant="ghost" icon={<ArrowLeft size={18} />} onClick={() => setSelectedFriend(null)}>戻る</Button>
                     <h2 style={{ margin: 0 }}>{selectedFriend.display_name || selectedFriend.username} のリスト</h2>
                 </header>
+
+                {selectedFriend.bio && (
+                    <div className="glass-panel" style={{ padding: '1rem', marginBottom: '2rem', fontSize: '0.9rem', color: 'var(--text-secondary)', borderLeft: '3px solid var(--primary)' }}>
+                        {selectedFriend.bio}
+                    </div>
+                )}
 
                 {friendItems.length > 0 ? (
                     <div style={{
