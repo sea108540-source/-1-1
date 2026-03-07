@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { FriendManager } from '../components/friends/FriendManager';
 import { GroupManager } from '../components/groups/GroupManager';
 import { Settings } from './Settings';
+import { MonthlyExpenseChart } from '../components/MonthlyExpenseChart';
 
 export const Home: React.FC = () => {
     const { user, loading: authLoading } = useAuth();
@@ -372,6 +373,7 @@ export const Home: React.FC = () => {
             {displayedItems.length > 0 ? (
                 filterObtained === 'obtained' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+                        <MonthlyExpenseChart items={displayedItems} />
                         {(() => {
                             const grouped = displayedItems.reduce((acc, item) => {
                                 const date = new Date(item.obtainedAt || item.createdAt);
