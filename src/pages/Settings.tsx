@@ -281,7 +281,13 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                             readOnly
                             value={`${window.location.origin}/p/${username || user?.id?.substring(0, 8)}`}
                             className="input-field"
-                            style={{ flex: 1, color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.5)' }}
+                            style={{
+                                flex: 1,
+                                color: 'var(--text-primary)',
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid var(--glass-border)',
+                                fontSize: '0.9rem'
+                            }}
                             onClick={(e) => e.currentTarget.select()}
                         />
                         <Button
