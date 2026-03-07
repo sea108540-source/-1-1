@@ -97,7 +97,8 @@ CREATE TABLE IF NOT EXISTS public.friendships (
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='friendships' AND column_name='status') THEN
-    ALTER TABLE public.friendships ADD COLUMN status text DEFAULT 'pending';
+    ALTER TABLE public.friendships ADD COLUMN status text DEFAULT 'accepted';
+    ALTER TABLE public.friendships ALTER COLUMN status SET DEFAULT 'pending';
   END IF;
 END $$;
 
