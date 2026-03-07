@@ -89,17 +89,65 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
     if (selectedFriend) {
         return (
             <div className="friend-wishlist-view">
-                <header style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                {/* 戻るボタン */}
+                <div style={{ marginBottom: '1.5rem' }}>
                     <Button variant="ghost" icon={<ArrowLeft size={18} />} onClick={() => setSelectedFriend(null)}>戻る</Button>
-                    <h2 style={{ margin: 0 }}>{selectedFriend.display_name || selectedFriend.username} のリスト</h2>
-                </header>
+                </div>
 
-                {selectedFriend.bio && (
-                    <div className="glass-panel" style={{ padding: '1rem', marginBottom: '2rem', fontSize: '0.9rem', color: 'var(--text-secondary)', borderLeft: '3px solid var(--primary)' }}>
-                        {selectedFriend.bio}
+                {/* Instagramライクなプロフィールカード */}
+                <div className="glass-panel" style={{ padding: '1.5rem 2rem', marginBottom: '2rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                        {/* アバター */}
+                        <div style={{ flexShrink: 0 }}>
+                            {selectedFriend.avatar_url ? (
+                                <img
+                                    src={selectedFriend.avatar_url}
+                                    alt={selectedFriend.display_name || 'avatar'}
+                                    style={{
+                                        width: 80,
+                                        height: 80,
+                                        borderRadius: '50%',
+                                        objectFit: 'cover',
+                                        border: '2px solid var(--primary)',
+                                    }}
+                                />
+                            ) : (
+                                <div style={{
+                                    width: 80,
+                                    height: 80,
+                                    borderRadius: '50%',
+                                    background: 'linear-gradient(135deg, var(--primary), var(--accent-primary, #8b5cf6))',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '2rem',
+                                    fontWeight: 'bold',
+                                    color: 'white',
+                                    border: '2px solid var(--primary)',
+                                }}>
+                                    {(selectedFriend.display_name || selectedFriend.username || '?')[0].toUpperCase()}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 名前・ID・自己紹介 */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: '0 0 0.15rem 0', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {selectedFriend.display_name || selectedFriend.username}
+                            </p>
+                            <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                @{selectedFriend.username}
+                            </p>
+                            {selectedFriend.bio && (
+                                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                                    {selectedFriend.bio}
+                                </p>
+                            )}
+                        </div>
                     </div>
-                )}
+                </div>
 
+                {/* アイテムリスト */}
                 {friendItems.length > 0 ? (
                     <div style={{
                         display: 'grid',
