@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 import type { DBSchema, IDBPDatabase } from 'idb';
 import { supabase } from './supabase';
-import type { Item, Profile, Group } from './types';
+import type { Item, Profile, Group, FriendRequest } from './types';
 
 const DB_NAME = 'WishlistDB';
 const DB_VERSION = 1;
@@ -189,18 +189,44 @@ export const searchUserByUsername = async (username: string): Promise<Profile | 
 };
 
 export const addFriend = async (friendId: string) => {
-  const { error } = await supabase.from('friendships').insert({ friend_id: friendId });
-  if (error) throw error;
+  // Check if there is already a pending request from the other side
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error('Not logged in');
+
+  const { data: existing } = await supabase
+    .from('friendships')
+    .select('id, status')
+    .eq('user_id', friendId)
+    .eq('friend_id', session.user.id)
+    .single();
+
+  if (existing) {
+    if (existing.status === 'pending') {
+      // Auto-accept if they already requested us
+      await acceptFriendRequest(existing.id);
+      return;
+    }
+    // Already accepted
+    return;
+  }
+
+  // Insert pending request
+  const { error } = await supabase.from('friendships').insert({ friend_id: friendId, status: 'pending' });
+  if (error) {
+    // Ignore duplicate error if we already sent a request
+    if (error.code !== '23505') throw error;
+  }
 };
 
 export const getFriends = async (): Promise<Profile[]> => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) return [];
 
-  // 1. Fetch friend IDs
+  // Fetch accepted friendships involving the current user (RLS allows seeing where user_id or friend_id equals our uid)
   const { data: friendships, error: friendError } = await supabase
     .from('friendships')
-    .select('friend_id')
+    .select('user_id, friend_id')
+    .eq('status', 'accepted')
     .order('created_at', { ascending: false });
 
   if (friendError) {
@@ -210,9 +236,10 @@ export const getFriends = async (): Promise<Profile[]> => {
 
   if (!friendships || friendships.length === 0) return [];
 
-  const friendIds = friendships.map(f => f.friend_id);
+  // The friend's ID is the one that is not our ID
+  const friendIds = friendships.map(f => f.user_id === session.user.id ? f.friend_id : f.user_id);
 
-  // 2. Fetch profiles
+  // Fetch profiles
   const { data: profiles, error: profileError } = await supabase
     .from('profiles')
     .select('*')
@@ -223,11 +250,58 @@ export const getFriends = async (): Promise<Profile[]> => {
     return [];
   }
 
-  // Preserve ordering from friendships if possible
   const profileMap = new Map((profiles || []).map(p => [p.id, p]));
   const orderedProfiles = friendIds.map(id => profileMap.get(id)).filter(Boolean) as Profile[];
 
   return orderedProfiles;
+};
+
+export const getFriendRequests = async (): Promise<FriendRequest[]> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return [];
+
+  const { data: requests, error } = await supabase
+    .from('friendships')
+    .select('id, user_id, created_at')
+    .eq('friend_id', session.user.id)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error || !requests) return [];
+
+  const senderIds = requests.map(r => r.user_id);
+  if (senderIds.length === 0) return [];
+
+  const { data: profiles } = await supabase.from('profiles').select('*').in('id', senderIds);
+  const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+  return requests.map(r => ({
+    id: r.id,
+    sender_id: r.user_id,
+    created_at: r.created_at,
+    sender: profileMap.get(r.user_id)
+  }));
+};
+
+export const acceptFriendRequest = async (friendshipId: string) => {
+  const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
+  if (error) throw error;
+};
+
+export const rejectFriendRequest = async (friendshipId: string) => {
+  const { error } = await supabase.from('friendships').delete().eq('id', friendshipId);
+  if (error) throw error;
+};
+
+export const removeFriend = async (friendId: string) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return;
+  // Try to delete both possible directions
+  const { error: err1 } = await supabase.from('friendships').delete().match({ user_id: session.user.id, friend_id: friendId });
+  const { error: err2 } = await supabase.from('friendships').delete().match({ user_id: friendId, friend_id: session.user.id });
+
+  if (err1) throw err1;
+  if (err2) throw err2;
 };
 
 export const getFriendItems = async (friendId: string): Promise<Item[]> => {

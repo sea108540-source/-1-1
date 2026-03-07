@@ -35,3 +35,10 @@ export type Group = {
     created_by: string;
     created_at: string;
 };
+
+export type FriendRequest = {
+    id: string;
+    sender_id: string;
+    created_at: string;
+    sender?: Profile;
+};

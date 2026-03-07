@@ -3,7 +3,7 @@ import { getFriends, addFriend, searchUserByUsername, getFriendItems, getProfile
 import type { Profile, Item } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { UserPlus, Users, ArrowLeft, Search, User as UserIcon, Cake } from 'lucide-react';
+import { UserPlus, Users, ArrowLeft, Search, User as UserIcon, Cake, Check, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ItemCard } from '../ItemCard';
 
@@ -14,6 +14,7 @@ interface FriendManagerProps {
 export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
     const { user } = useAuth();
     const [friends, setFriends] = useState<Profile[]>([]);
+    const [requests, setRequests] = useState<any[]>([]); // To hold friend requests
     const [searchQuery, setSearchQuery] = useState('');
     const [foundUser, setFoundUser] = useState<Profile | null>(null);
     const [selectedFriend, setSelectedFriend] = useState<Profile | null>(null);
@@ -25,12 +26,33 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
 
     useEffect(() => {
         loadFriends();
+        loadRequests();
         if (user) loadMyProfile();
     }, [user]);
 
     const loadFriends = async () => {
         const data = await getFriends();
         setFriends(data);
+    };
+
+    const loadRequests = async () => {
+        // assuming import { getFriendRequests } from '../../lib/db' was added or will be added
+        const { getFriendRequests } = await import('../../lib/db');
+        const reqData = await getFriendRequests();
+        setRequests(reqData);
+    };
+
+    const handleAcceptRequest = async (id: string) => {
+        const { acceptFriendRequest } = await import('../../lib/db');
+        await acceptFriendRequest(id);
+        loadRequests();
+        loadFriends();
+    };
+
+    const handleRejectRequest = async (id: string) => {
+        const { rejectFriendRequest } = await import('../../lib/db');
+        await rejectFriendRequest(id);
+        loadRequests();
     };
 
     const loadMyProfile = async () => {
@@ -52,12 +74,12 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
         if (!foundUser) return;
         try {
             await addFriend(foundUser.id);
-            alert(`${foundUser.display_name || foundUser.username} を友達に追加しました！`);
+            alert(`${foundUser.display_name || foundUser.username} に友達リクエストを送信しました！\n相手が承認すると友達リストに追加されます。`);
             setFoundUser(null);
             setSearchQuery('');
             loadFriends();
-        } catch (err) {
-            alert('友達の追加に失敗しました。既に追加されているか、自分自身を追加しようとしている可能性があります。');
+        } catch (err: any) {
+            alert('リクエストの送信に失敗しました:\n' + (err.message || '既に追加されているか、自分自身を追加しようとしている可能性があります。'));
         }
     };
 
@@ -227,6 +249,52 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                 )}
             </div>
 
+            {/* Friend Requests */}
+            {requests.length > 0 && (
+                <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem', border: '1px solid var(--primary)' }}>
+                    <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{
+                            background: 'var(--primary)',
+                            color: 'white',
+                            borderRadius: '50%',
+                            width: '20px',
+                            height: '20px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                        }}>{requests.length}</span>
+                        届いている友達リクエスト
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {requests.map(req => (
+                            <div key={req.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <div style={{ flexShrink: 0 }}>
+                                        {req.sender?.avatar_url ? (
+                                            <img src={req.sender.avatar_url} alt="avatar" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+                                        ) : (
+                                            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                                {(req.sender?.display_name || req.sender?.username || '?')[0].toUpperCase()}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: 'bold' }}>{req.sender?.display_name || req.sender?.username}</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>@{req.sender?.username}</div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <Button variant="primary" size="sm" onClick={() => handleAcceptRequest(req.id)} icon={<Check size={16} />}>承認</Button>
+                                    <Button variant="ghost" size="sm" onClick={() => handleRejectRequest(req.id)} icon={<X size={16} />} style={{ color: 'var(--text-muted)' }}>削除</Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Search Friends */}
             <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
                 <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>友達をIDで検索</h3>
@@ -251,7 +319,7 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>@{foundUser.username}</div>
                             </div>
                         </div>
-                        <Button variant="primary" size="sm" icon={<UserPlus size={16} />} onClick={handleAddFriend}>友達追加</Button>
+                        <Button variant="primary" size="sm" icon={<UserPlus size={16} />} onClick={handleAddFriend}>リクエスト送信</Button>
                     </div>
                 )}
                 {searchQuery && !loading && !foundUser && foundUser !== null && (

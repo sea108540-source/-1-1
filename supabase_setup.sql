@@ -94,13 +94,27 @@ CREATE TABLE IF NOT EXISTS public.friendships (
   UNIQUE(user_id, friend_id)
 );
 
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='friendships' AND column_name='status') THEN
+    ALTER TABLE public.friendships ADD COLUMN status text DEFAULT 'pending';
+  END IF;
+END $$;
+
 ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
+
 DROP POLICY IF EXISTS "Users can view their own friendships" ON public.friendships;
-CREATE POLICY "Users can view their own friendships" ON public.friendships FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can view their own friendships" ON public.friendships FOR SELECT USING (auth.uid() = user_id OR auth.uid() = friend_id);
+
 DROP POLICY IF EXISTS "Users can add friends" ON public.friendships;
 CREATE POLICY "Users can add friends" ON public.friendships FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their received requests" ON public.friendships;
+CREATE POLICY "Users can update their received requests" ON public.friendships FOR UPDATE USING (auth.uid() = friend_id);
+
 DROP POLICY IF EXISTS "Users can remove friends" ON public.friendships;
-CREATE POLICY "Users can remove friends" ON public.friendships FOR DELETE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete their received requests" ON public.friendships;
+CREATE POLICY "Users can remove friends" ON public.friendships FOR DELETE USING (auth.uid() = user_id OR auth.uid() = friend_id);
 
 -- 3. items テーブル
 CREATE TABLE IF NOT EXISTS public.items (
