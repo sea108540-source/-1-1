@@ -41,7 +41,7 @@ export const getDB = async () => {
 // ========================
 const mapToDbItem = (item: Item, userId: string) => ({
   id: item.id,
-  user_id: userId,
+  user_id: item.creator?.id || userId,
   title: item.title,
   url: item.url || null,
   image_type: item.image?.type || null,
@@ -351,7 +351,7 @@ export const removeFriend = async (friendId: string) => {
 export const getFriendItems = async (friendId: string): Promise<Item[]> => {
   const { data, error } = await supabase
     .from('items')
-    .select('*, groups(id, name), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)')
+    .select('*, groups(id, name), profiles!items_user_id_fkey(id, display_name, username, avatar_url), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)')
     .eq('user_id', friendId)
     .order('created_at', { ascending: false });
 
