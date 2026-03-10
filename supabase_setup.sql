@@ -5,8 +5,17 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   username text UNIQUE,
   avatar_url text,
   bio text,
+  birthday date,
   updated_at timestamp with time zone DEFAULT now()
 );
+
+-- 安全に birthday カラムを追加する処理 (既存テーブル用)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='birthday') THEN
+    ALTER TABLE public.profiles ADD COLUMN birthday date;
+  END IF;
+END $$;
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
@@ -37,16 +46,23 @@ CREATE TABLE IF NOT EXISTS public.group_members (
 
 ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
 
+-- ユーティリティ関数（RLSの無限ループを回避するため）
+CREATE OR REPLACE FUNCTION public.is_group_member(check_group_id uuid)
+RETURNS boolean
+LANGUAGE sql SECURITY DEFINER
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.group_members 
+    WHERE group_id = check_group_id AND user_id = auth.uid()
+  );
+$$;
+
 -- Group RLS Policies
--- Users can view groups they are members of
 DROP POLICY IF EXISTS "Users can view groups they are members of" ON public.groups;
 CREATE POLICY "Users can view groups they are members of" 
 ON public.groups FOR SELECT 
 USING (
-  EXISTS (
-    SELECT 1 FROM public.group_members 
-    WHERE public.group_members.group_id = public.groups.id AND public.group_members.user_id = auth.uid()
-  )
+  created_by = auth.uid() OR public.is_group_member(id)
 );
 
 -- Users can insert groups
@@ -58,21 +74,19 @@ DROP POLICY IF EXISTS "Users can delete own groups" ON public.groups;
 CREATE POLICY "Users can delete own groups" ON public.groups FOR DELETE USING (auth.uid() = created_by);
 
 -- Group Members RLS Policies
--- Users can view members of groups they are in
 DROP POLICY IF EXISTS "Users can view group members" ON public.group_members;
 CREATE POLICY "Users can view group members" 
 ON public.group_members FOR SELECT 
 USING (
-  EXISTS (
-    SELECT 1 FROM public.group_members gm
-    WHERE gm.group_id = public.group_members.group_id AND gm.user_id = auth.uid()
-  )
+  user_id = auth.uid() OR 
+  public.is_group_member(group_id) OR
+  EXISTS (SELECT 1 FROM public.groups g WHERE g.id = group_id AND g.created_by = auth.uid())
 );
 
 -- Users can insert members
 DROP POLICY IF EXISTS "Users can add group members" ON public.group_members;
 CREATE POLICY "Users can add group members" ON public.group_members FOR INSERT WITH CHECK (
-  auth.uid() IN (SELECT user_id FROM public.group_members WHERE group_id = public.group_members.group_id)
+  public.is_group_member(group_id)
   OR auth.uid() = (SELECT created_by FROM public.groups WHERE id = public.group_members.group_id)
 );
 
@@ -131,19 +145,43 @@ CREATE TABLE IF NOT EXISTS public.items (
   price text,
   created_at bigint NOT NULL,
   obtained boolean NOT NULL DEFAULT false,
-  obtained_at bigint
+  obtained_at bigint,
+  is_public boolean DEFAULT true
 );
 
--- Add group_id and reserved_by to existing table safely if it exists
+-- 安全にカラムを追加、および既存データの整合性をとる処理
 DO $$
 BEGIN
+  -- カラム追加
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='items' AND column_name='group_id') THEN
     ALTER TABLE public.items ADD COLUMN group_id uuid REFERENCES public.groups ON DELETE CASCADE;
   END IF;
   
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='items' AND column_name='reserved_by') THEN
-    ALTER TABLE public.items ADD COLUMN reserved_by uuid REFERENCES auth.users ON DELETE SET NULL;
+    ALTER TABLE public.items ADD COLUMN reserved_by uuid;
   END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='items' AND column_name='is_public') THEN
+    ALTER TABLE public.items ADD COLUMN is_public boolean DEFAULT true;
+  END IF;
+
+  -- 整合性チェック: プロフィールがないユーザーのダミー作成
+  INSERT INTO public.profiles (id, display_name)
+  SELECT DISTINCT user_id, '新規ユーザー' FROM public.items 
+  WHERE user_id NOT IN (SELECT id FROM public.profiles) ON CONFLICT (id) DO NOTHING;
+
+  -- 整合性チェック: 存在しないユーザーの予約を解除
+  UPDATE public.items SET reserved_by = NULL 
+  WHERE reserved_by IS NOT NULL AND reserved_by NOT IN (SELECT id FROM public.profiles);
+
+  -- 外部キー制約の再試行 (アプリが期待する名前で固定)
+  ALTER TABLE public.items DROP CONSTRAINT IF EXISTS items_user_id_profiles_fkey;
+  ALTER TABLE public.items DROP CONSTRAINT IF EXISTS items_user_id_fkey;
+  ALTER TABLE public.items ADD CONSTRAINT items_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+
+  ALTER TABLE public.items DROP CONSTRAINT IF EXISTS items_reserved_by_fkey;
+  ALTER TABLE public.items ADD CONSTRAINT items_reserved_by_fkey FOREIGN KEY (reserved_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
+
 END $$;
 
 ALTER TABLE public.items ENABLE ROW LEVEL SECURITY;
@@ -216,4 +254,3 @@ CREATE POLICY "Users can delete their own items or group items" ON public.items 
 -- Public items can be viewed by anyone (for sharing profile via URL)
 DROP POLICY IF EXISTS "Public items are viewable by everyone" ON public.items;
 CREATE POLICY "Public items are viewable by everyone" ON public.items FOR SELECT USING (true);
-
