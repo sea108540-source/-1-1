@@ -72,10 +72,9 @@ const mapFromDbItem = (row: any): Item => ({
   obtainedAt: row.obtained_at || undefined,
   group_id: row.group_id || undefined,
   is_public: row.is_public ?? true,
-  creator: row.profiles || undefined,
+  creator: row.creator || row.profiles || undefined,
   group: row.groups || undefined,
   reserved_by: row.reserved_by || undefined,
-  // Join aliased to reserver or mapped from reserved_by manually if populated
   reserver: row.reserver || undefined,
 });
 
@@ -88,7 +87,7 @@ export const getItems = async (): Promise<Item[]> => {
   if (session?.user) {
     const { data, error } = await supabase
       .from('items')
-      .select('*, groups(id, name), profiles!items_user_id_fkey(id, display_name, username, avatar_url), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)')
+      .select('*, groups(id, name), creator:profiles!items_user_id_fkey(id, display_name, username, avatar_url), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
     if (error) { console.error('Supabase fetch error:', error); return []; }
@@ -101,7 +100,7 @@ export const getItems = async (): Promise<Item[]> => {
 export const getItemById = async (id: string): Promise<Item | undefined> => {
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.user) {
-    const { data, error } = await supabase.from('items').select('*, groups(id, name), profiles!items_user_id_fkey(id, display_name, username, avatar_url), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)').eq('id', id).single();
+    const { data, error } = await supabase.from('items').select('*, groups(id, name), creator:profiles!items_user_id_fkey(id, display_name, username, avatar_url), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)').eq('id', id).single();
     if (error || !data) return undefined;
     return mapFromDbItem(data);
   }
@@ -351,7 +350,7 @@ export const removeFriend = async (friendId: string) => {
 export const getFriendItems = async (friendId: string): Promise<Item[]> => {
   const { data, error } = await supabase
     .from('items')
-    .select('*, groups(id, name), profiles!items_user_id_fkey(id, display_name, username, avatar_url), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)')
+    .select('*, groups(id, name), creator:profiles!items_user_id_fkey(id, display_name, username, avatar_url), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)')
     .eq('user_id', friendId)
     .order('created_at', { ascending: false });
 
@@ -489,7 +488,7 @@ export const getGroupItems = async (groupId: string): Promise<Item[]> => {
   // 3. Map manually, attaching the creator profile and reserver profile
   return data.map(row => mapFromDbItem({
     ...row,
-    profiles: profileMap.get(row.user_id) || undefined,
+    creator: profileMap.get(row.user_id) || undefined,
     reserver: profileMap.get(row.reserved_by) || undefined
   }));
 };
