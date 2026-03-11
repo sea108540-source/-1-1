@@ -25,7 +25,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentView, onNavigate, o
             bottom: 0,
             left: 0,
             right: 0,
-            height: '64px',
+            height: 'calc(64px + env(safe-area-inset-bottom))',
             background: 'rgba(255, 255, 255, 0.85)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',

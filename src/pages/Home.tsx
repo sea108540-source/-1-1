@@ -363,7 +363,7 @@ export const Home: React.FC = () => {
                                             </div>
                                             <div style={{
                                                 display: 'grid',
-                                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
                                                 gap: '1rem'
                                             }}>
                                                 {itemsInMonth.map(item => (
@@ -389,7 +389,7 @@ export const Home: React.FC = () => {
                 ) : (
                     <div style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
                         gap: '1rem'
                     }}>
                         {displayedItems.map(item => (
