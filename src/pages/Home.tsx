@@ -189,7 +189,18 @@ export const Home: React.FC = () => {
                     setSelectedEventDate(date);
                     setIsEventFormOpen(true);
                 }} />
-                
+
+                <div style={{ marginTop: '2rem' }}>
+                    <MonthlyExpenseChart items={items} />
+                    {totalSpent > 0 && (
+                        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>入手済みの総支出額:</span>
+                            <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '0.02em' }}>
+                                {formatPrice(totalSpent)}
+                            </span>
+                        </div>
+                    )}
+                </div>
                 <EventForm 
                     isOpen={isEventFormOpen} 
                     onClose={() => setIsEventFormOpen(false)} 
@@ -320,19 +331,6 @@ export const Home: React.FC = () => {
                 </button>
             </div>
 
-            {filterObtained === 'obtained' && (
-                <div style={{ marginBottom: '2rem' }}>
-                    <MonthlyExpenseChart items={items} />
-                    {totalSpent > 0 && (
-                        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>入手済みの総支出額:</span>
-                            <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '0.02em' }}>
-                                {formatPrice(totalSpent)}
-                            </span>
-                        </div>
-                    )}
-                </div>
-            )}
 
             {/* Category Filter Pills */}
             {categories.length > 1 && (
