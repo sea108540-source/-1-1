@@ -106,8 +106,6 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
                             onReserve={handleReserve}
                             onCancelReservation={handleCancelReservation}
                             onClick={(item) => {
-                                // 自分のアイテム以外は編集フォームを開かせない (閲覧のみとする)
-                                if (item.creator?.id !== user?.id) return;
                                 setEditingItem(item);
                                 setIsFormOpen(true);
                             }}
@@ -130,6 +128,7 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
                 onDelete={handleDelete}
                 initialData={editingItem}
                 groupId={group.id}
+                readOnly={editingItem?.creator?.id !== user?.id}
             />
         </div>
     );

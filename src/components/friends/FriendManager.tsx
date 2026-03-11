@@ -7,6 +7,8 @@ import { UserPlus, Users, ArrowLeft, Search, User as UserIcon, Cake, Check, X, Q
 import { QRCodeCanvas } from 'qrcode.react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ItemCard } from '../ItemCard';
+import { ItemForm } from '../ItemForm';
+import { updateItem, deleteItem } from '../../lib/db';
 
 interface FriendManagerProps {
     onBack: () => void;
@@ -25,6 +27,8 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
     const [isSettingId, setIsSettingId] = useState(false);
     const [newUsername, setNewUsername] = useState('');
     const [showQRModal, setShowQRModal] = useState(false);
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState<Item | null>(null);
 
     useEffect(() => {
         loadFriends();
@@ -211,7 +215,10 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                                 key={item.id}
                                 item={item}
                                 onToggleObtained={() => { }} // 友達のリストは変更不可
-                                onClick={() => { }} // とりあえずviewだけ
+                                onClick={(item) => {
+                                    setEditingItem(item);
+                                    setIsFormOpen(true);
+                                }}
                             />
                         ))}
                     </div>
@@ -220,6 +227,31 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                         <p>アイテムがありません</p>
                     </div>
                 )}
+
+                <ItemForm
+                    isOpen={isFormOpen}
+                    onClose={() => { setIsFormOpen(false); setEditingItem(null); }}
+                    onSave={async (item) => {
+                        await updateItem(item);
+                        if (selectedFriend) {
+                            const items = await getFriendItems(selectedFriend.id);
+                            setFriendItems(items);
+                        }
+                    }}
+                    onDelete={async (id) => {
+                        if (confirm('本当に削除しますか？')) {
+                            await deleteItem(id);
+                            setIsFormOpen(false);
+                            setEditingItem(null);
+                            if (selectedFriend) {
+                                const items = await getFriendItems(selectedFriend.id);
+                                setFriendItems(items);
+                            }
+                        }
+                    }}
+                    initialData={editingItem}
+                    readOnly={editingItem?.creator?.id !== user?.id}
+                />
             </div>
         );
     }

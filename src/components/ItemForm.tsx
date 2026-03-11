@@ -14,9 +14,10 @@ interface ItemFormProps {
     onDelete?: (id: string) => void;
     initialData?: Item | null;
     groupId?: string;
+    readOnly?: boolean;
 }
 
-export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onDelete, initialData, groupId }) => {
+export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onDelete, initialData, groupId, readOnly }) => {
     const [title, setTitle] = useState('');
     const [url, setUrl] = useState('');
     const [memo, setMemo] = useState('');
@@ -196,15 +197,17 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
     const footer = (
         <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
             <div>
-                {initialData && onDelete && (
+                {initialData && onDelete && !readOnly && (
                     <Button variant="danger" onClick={() => onDelete(initialData.id)}>
                         削除
                     </Button>
                 )}
             </div>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <Button variant="ghost" onClick={onClose}>キャンセル</Button>
-                <Button variant="primary" onClick={handleSave}>{initialData ? '更新する' : '追加する'}</Button>
+                <Button variant="ghost" onClick={onClose}>{readOnly ? '閉じる' : 'キャンセル'}</Button>
+                {!readOnly && (
+                    <Button variant="primary" onClick={handleSave}>{initialData ? '更新する' : '追加する'}</Button>
+                )}
             </div>
         </div>
     );
@@ -212,7 +215,12 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={initialData ? 'アイテムの編集' : '新しいアイテムを追加'} footer={footer}>
+        <Modal 
+            isOpen={isOpen} 
+            onClose={onClose} 
+            title={readOnly ? `${initialData?.creator?.display_name || '誰か'}のアイテム` : (initialData ? 'アイテムの編集' : '新しいアイテムを追加')} 
+            footer={footer}
+        >
             <div
                 onPaste={handlePaste}
                 onDrop={handleDrop}
@@ -220,21 +228,23 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                 style={{ display: 'flex', flexDirection: 'column', gap: '1rem', outline: 'none' }}
                 tabIndex={0}
             >
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                    Tip: クリップボード(Ctrl+V)やドラッグ＆ドロップ、または下の画像領域から追加できます。
-                </p>
+                {!readOnly && (
+                    <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        Tip: クリップボード(Ctrl+V)やドラッグ＆ドロップ、または下の画像領域から追加できます。
+                    </p>
+                )}
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => !readOnly && fileInputRef.current?.click()}
                         style={{
                             width: '100px', height: '100px', borderRadius: 'var(--radius-md)',
                             background: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                             overflow: 'hidden', border: '1px dashed var(--glass-border)', flexShrink: 0,
-                            cursor: 'pointer', transition: 'background 0.2s'
+                            cursor: readOnly ? 'default' : 'pointer', transition: 'background 0.2s'
                         }}
-                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                        onMouseOver={(e) => !readOnly && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)')}
+                        onMouseOut={(e) => !readOnly && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
                     >
                         {image ? (
                             <img src={image.value} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -242,21 +252,23 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                             <ImagePlus size={24} color="var(--text-muted)" />
                         )}
                     </div>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            ref={fileInputRef}
-                            style={{ display: 'none' }}
-                            onChange={handleFileChange}
-                        />
-                        <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
-                            {image ? '画像を変更' : '画像を選択'}
-                        </Button>
-                        {image && (
-                            <Button variant="ghost" size="sm" onClick={() => setImage(undefined)} style={{ color: 'var(--danger)' }}>画像を削除</Button>
-                        )}
-                    </div>
+                    {!readOnly && (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                onChange={handleFileChange}
+                            />
+                            <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+                                {image ? '画像を変更' : '画像を選択'}
+                            </Button>
+                            {image && (
+                                <Button variant="ghost" size="sm" onClick={() => setImage(undefined)} style={{ color: 'var(--danger)' }}>画像を削除</Button>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <Input
@@ -265,6 +277,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                     autoFocus
+                    readOnly={readOnly}
                 />
 
                 <Input
@@ -272,6 +285,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                     type="date"
                     value={targetDate}
                     onChange={e => setTargetDate(e.target.value)}
+                    readOnly={readOnly}
                 />
 
                 <div className="input-group">
@@ -287,13 +301,14 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                         value={url}
                         onChange={e => setUrl(e.target.value)}
                         onBlur={handleUrlBlur}
+                        readOnly={readOnly}
                     />
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     <div className="input-wrapper" style={{ flex: '1 1 120px' }}>
                         <label className="input-label">優先度</label>
-                        <select className="input-field" value={priority} onChange={e => setPriority(e.target.value as any)}>
+                        <select className="input-field" value={priority} onChange={e => setPriority(e.target.value as any)} disabled={readOnly}>
                             <option value="high">高</option>
                             <option value="mid">中</option>
                             <option value="low">低</option>
@@ -305,6 +320,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                         value={category}
                         onChange={e => setCategory(e.target.value)}
                         style={{ flex: 1 }}
+                        readOnly={readOnly}
                     />
                 </div>
 
@@ -313,32 +329,37 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                     placeholder="例: 12,800円"
                     value={price}
                     onChange={e => setPrice(e.target.value)}
+                    readOnly={readOnly}
                 />
 
-                <div className="input-wrapper">
-                    <label className="input-label">メモ</label>
-                    <textarea
-                        className="input-field"
-                        placeholder="補足情報など"
-                        value={memo}
-                        onChange={e => setMemo(e.target.value)}
-                    />
-                </div>
+                {!readOnly && (
+                    <div className="input-wrapper">
+                        <label className="input-label">メモ</label>
+                        <textarea
+                            className="input-field"
+                            placeholder="補足情報など"
+                            value={memo}
+                            onChange={e => setMemo(e.target.value)}
+                        />
+                    </div>
+                )}
 
-                <div className="input-wrapper">
-                    <label className="input-label">共有するグループ</label>
-                    <select
-                        className="input-field"
-                        value={selectedGroupId}
-                        onChange={e => setSelectedGroupId(e.target.value)}
-                        disabled={!!groupId}
-                    >
-                        <option value="">（選択しない・個人用）</option>
-                        {groups.map(g => (
-                            <option key={g.id} value={g.id}>{g.name}</option>
-                        ))}
-                    </select>
-                </div>
+                {!readOnly && (
+                    <div className="input-wrapper">
+                        <label className="input-label">共有するグループ</label>
+                        <select
+                            className="input-field"
+                            value={selectedGroupId}
+                            onChange={e => setSelectedGroupId(e.target.value)}
+                            disabled={!!groupId}
+                        >
+                            <option value="">（選択しない・個人用）</option>
+                            {groups.map(g => (
+                                <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {!groupId && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
