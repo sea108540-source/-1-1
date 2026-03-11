@@ -185,10 +185,16 @@ export const Home: React.FC = () => {
     if (currentView === 'calendar') {
         return (
             <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
-                <CalendarView onOpenEventForm={(date) => {
-                    setSelectedEventDate(date);
-                    setIsEventFormOpen(true);
-                }} />
+                <CalendarView 
+                    onOpenEventForm={(date) => {
+                        setSelectedEventDate(date);
+                        setIsEventFormOpen(true);
+                    }} 
+                    onItemClick={(item) => {
+                        setEditingItem(item);
+                        setIsFormOpen(true);
+                    }}
+                />
 
                 <div style={{ marginTop: '2rem' }}>
                     <MonthlyExpenseChart items={items} />

@@ -13,9 +13,10 @@ import './calendar-custom.css';
 
 interface CalendarViewProps {
     onOpenEventForm: (date?: Date) => void;
+    onItemClick: (item: Item) => void;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm, onItemClick }) => {
     const { user } = useAuth();
     const [date, setDate] = useState<Date>(new Date());
     const [items, setItems] = useState<Item[]>([]);
@@ -141,7 +142,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm }) =
                         ))}
 
                         {selectedDayItems.map(i => (
-                            <div key={i.id} className="detail-card item-card">
+                            <div 
+                                key={i.id} 
+                                className="detail-card item-card" 
+                                onClick={() => onItemClick(i)}
+                                style={{ cursor: 'pointer' }}
+                            >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                                     <div className="dot item-dot"></div>
                                     {i.title}
