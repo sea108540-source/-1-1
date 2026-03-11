@@ -179,7 +179,7 @@ export const Home: React.FC = () => {
 
     if (currentView === 'friends') {
         return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 80px 1rem' }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
                 <FriendManager onBack={() => setCurrentView('my-wishlist')} />
                 <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
             </div>
@@ -188,7 +188,7 @@ export const Home: React.FC = () => {
 
     if (currentView === 'groups') {
         return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 80px 1rem' }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
                 <GroupManager onBack={() => setCurrentView('my-wishlist')} />
                 <FloatingActionButton onClick={() => { setEditingItem(null); setIsFormOpen(true); }} visible={true} />
                 <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
@@ -198,7 +198,7 @@ export const Home: React.FC = () => {
 
     if (currentView === 'settings') {
         return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 80px 1rem' }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
                 <Settings onBack={() => setCurrentView('my-wishlist')} />
                 <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
             </div>
