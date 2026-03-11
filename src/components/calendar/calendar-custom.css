@@ -50,20 +50,26 @@
   }
   
   .custom-react-calendar .react-calendar__month-view__days__day {
-    padding: 0.75rem 0.25rem;
+    padding: 0.25rem;
     background: none;
     border: none;
     font-size: 0.9rem;
     color: var(--text-primary);
     cursor: pointer;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm); /* 少し角丸を小さくして枠を広く使う */
     transition: all 0.2s;
     position: relative;
-    aspect-ratio: 1;
+    min-height: 70px; /* 高さを確保 */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
+    border: 1px solid transparent; /* 枠線をうっすらつける準備 */
+  }
+  
+  .custom-react-calendar .react-calendar__month-view__days__day:not(.react-calendar__month-view__days__day--neighboringMonth) {
+    border-bottom: 1px solid rgba(0,0,0,0.03);
+    border-right: 1px solid rgba(0,0,0,0.03);
   }
   
   .custom-react-calendar .react-calendar__tile:enabled:hover {
@@ -89,32 +95,49 @@
     color: var(--text-muted);
   }
   
-  /* Dots for events */
-  .calendar-tile-content {
+  /* Labels for events and items (New Design) */
+  .calendar-tile-content-labels {
     display: flex;
+    flex-direction: column;
     gap: 2px;
-    margin-top: 4px;
-    justify-content: center;
-    flex-wrap: wrap;
-    max-width: 80%;
+    margin-top: 2px;
+    width: 100%;
+    align-items: stretch;
   }
   
-  .event-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
+  .calendar-label {
+    font-size: 0.65rem; /* スマホでも入るようにかなり小さめ */
+    padding: 2px 4px;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    line-height: 1.1;
+    color: rgba(0,0,0,0.8);
+    font-weight: 500;
   }
   
-  .event-anniversary {
-    background-color: var(--warning); /* Mustard */
+  .label-event {
+    background-color: var(--warning);
+    border-left: 2px solid darken(var(--warning), 20%);
   }
   
-  .event-item {
-    background-color: var(--success); /* Sage green */
+  .label-item {
+    background-color: var(--success);
+    color: white;
   }
   
-  .custom-react-calendar .react-calendar__tile--active .event-dot {
-    background-color: white;
+  .calendar-label-more {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 1px;
+    font-weight: 600;
+  }
+  
+  .custom-react-calendar .react-calendar__tile--active .calendar-label {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2); /* アクティブ時は少し浮かす */
   }
   
   /* Details section */

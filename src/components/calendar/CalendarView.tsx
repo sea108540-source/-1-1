@@ -53,14 +53,27 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm }) =
 
         if (dayItems.length === 0 && dayEvents.length === 0) return null;
 
+        const allDayEntries = [
+            ...dayEvents.map(e => ({ id: `e-${e.id}`, title: e.title, type: 'event' })),
+            ...dayItems.map(i => ({ id: `i-${i.id}`, title: i.title, type: 'item' }))
+        ];
+
+        const MAX_DISPLAY = 2; // 表示する最大件数
+        const displayedEntries = allDayEntries.slice(0, MAX_DISPLAY);
+        const remainingCount = allDayEntries.length - MAX_DISPLAY;
+
         return (
-            <div className="calendar-tile-content">
-                {dayEvents.map(e => (
-                    <div key={e.id} className="event-dot event-anniversary" title={e.title}></div>
+            <div className="calendar-tile-content-labels">
+                {displayedEntries.map(entry => (
+                    <div key={entry.id} className={`calendar-label ${entry.type === 'event' ? 'label-event' : 'label-item'}`} title={entry.title}>
+                        {entry.title}
+                    </div>
                 ))}
-                {dayItems.map(i => (
-                    <div key={i.id} className="event-dot event-item" title={i.title}></div>
-                ))}
+                {remainingCount > 0 && (
+                    <div className="calendar-label-more">
+                        +{remainingCount}件
+                    </div>
+                )}
             </div>
         );
     };
