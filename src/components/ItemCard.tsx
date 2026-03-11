@@ -3,6 +3,7 @@ import type { Item } from '../lib/types';
 import { Badge } from './ui/Badge';
 import { ExternalLink, CheckCircle2, Clock, Lock, Users } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatPrice } from '../lib/utils';
 
 interface ItemCardProps {
     item: Item;
@@ -82,7 +83,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, currentUserId, onToggl
                     </div>
 
                     <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {item.price && <span>{item.price}</span>}
+                        {item.price && <span>{formatPrice(item.price)}</span>}
                         {item.category && <Badge>{item.category}</Badge>}
                         {item.group && (
                             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', fontWeight: 500, background: 'rgba(var(--primary-rgb, 14, 165, 233), 0.1)', padding: '2px 8px', borderRadius: '12px' }} title="グループ">

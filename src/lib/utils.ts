@@ -26,3 +26,26 @@ export function parsePriceString(priceString?: string | null): number {
 
     return isNaN(value) ? 0 : value;
 }
+
+/**
+ * Formats a price into a string with "円" suffix.
+ * Handles both numeric values and string-based prices.
+ */
+export function formatPrice(price?: string | number | null): string {
+    if (price === undefined || price === null || price === '') return '';
+    
+    if (typeof price === 'number') {
+        return price.toLocaleString() + '円';
+    }
+
+    // Attempt to parse if it's a string, to normalize it (remove ¥, add 円)
+    const num = parsePriceString(price);
+    if (num > 0) {
+        return num.toLocaleString() + '円';
+    }
+
+    // If it's a non-numeric string like "未定", just append "円" if it's not already there
+    // but the user said "everything", so let's be careful.
+    return price.includes('円') ? price : price + '円';
+}
+

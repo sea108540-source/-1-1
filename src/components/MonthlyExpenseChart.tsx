@@ -9,7 +9,7 @@ import {
     Sector
 } from 'recharts';
 import type { Item } from '../lib/types';
-import { parsePriceString } from '../lib/utils';
+import { parsePriceString, formatPrice } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { getProfile, updateProfile } from '../lib/db';
 import { Edit2, Save, X } from 'lucide-react';
@@ -43,7 +43,7 @@ const renderActiveShape = (props: any) => {
                 {payload.name}
             </text>
             <text x={cx} y={cy + 15} dy={8} textAnchor="middle" fill="#fff" fontSize={16} fontWeight={600}>
-                ¥{value.toLocaleString()}
+                {formatPrice(value)}
             </text>
             <text x={cx} y={cy + 35} dy={8} textAnchor="middle" fill="var(--text-secondary)" fontSize={12}>
                 {`(${(percent * 100).toFixed(1)}%)`}
@@ -190,7 +190,7 @@ export const MonthlyExpenseChart: React.FC<MonthlyExpenseChartProps> = ({ items 
                         {data.name}
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0' }}>
-                        <span style={{ fontWeight: 600 }}>¥{data.value.toLocaleString()}</span>
+                        <span style={{ fontWeight: 600 }}>{formatPrice(data.value)}</span>
                         <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{percent}%</span>
                     </div>
                 </div>
@@ -232,14 +232,14 @@ export const MonthlyExpenseChart: React.FC<MonthlyExpenseChartProps> = ({ items 
                             </div>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ fontSize: '1.1rem' }}>{budget != null && budget > 0 ? `¥${budget.toLocaleString()}` : '未設定'}</span>
+                                <span style={{ fontSize: '1.1rem' }}>{budget != null && budget > 0 ? formatPrice(budget) : '未設定'}</span>
                                 <button onClick={() => setIsEditingBudget(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex', borderRadius: '4px' }}><Edit2 size={14} /></button>
                             </div>
                         )}
                     </div>
                     {budget != null && budget > 0 && selectedMonth !== 'all' && (
                         <div style={{ fontSize: '0.875rem', color: totalAmount > budget ? 'var(--danger)' : 'var(--text-secondary)' }}>
-                            使用額: ¥{totalAmount.toLocaleString()} <span style={{ opacity: 0.7 }}>(残り: ¥{Math.max(0, budget - totalAmount).toLocaleString()})</span>
+                            使用額: {formatPrice(totalAmount)} <span style={{ opacity: 0.7 }}>(残り: {formatPrice(Math.max(0, budget - totalAmount))})</span>
                         </div>
                     )}
                     {budget != null && budget > 0 && selectedMonth === 'all' && (

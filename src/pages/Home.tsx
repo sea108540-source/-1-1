@@ -4,7 +4,7 @@ import type { Item } from '../lib/types';
 import { generateShareLink, parseSharedItemsFromUrl, importDataFromJsonFile } from '../lib/shareUtils';
 import { ItemCard } from '../components/ItemCard';
 import { ItemForm } from '../components/ItemForm';
-import { parsePriceString } from '../lib/utils';
+import { parsePriceString, formatPrice } from '../lib/utils';
 import { AuthModal } from '../components/AuthModal';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -327,7 +327,7 @@ export const Home: React.FC = () => {
                         <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
                             <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>入手済みの総支出額:</span>
                             <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '0.02em' }}>
-                                ¥{totalSpent.toLocaleString()}
+                                {formatPrice(totalSpent)}
                             </span>
                         </div>
                     )}
@@ -388,7 +388,7 @@ export const Home: React.FC = () => {
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>
                                                 <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)' }}>{month}</h2>
                                                 <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)', letterSpacing: '0.02em' }}>
-                                                    ¥{monthTotal.toLocaleString()}
+                                                    {formatPrice(monthTotal)}
                                                 </div>
                                             </div>
                                             <div style={{

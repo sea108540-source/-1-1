@@ -4,6 +4,7 @@ import 'react-calendar/dist/Calendar.css';
 import { format, isSameDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { getItems, getCalendarEvents } from '../../lib/db';
+import { formatPrice } from '../../lib/utils';
 import type { Item, CalendarEvent } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { Calendar as CalendarIcon, Plus } from 'lucide-react';
@@ -70,7 +71,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm }) =
                             {entry.title}
                         </div>
                         {entry.amount && (
-                            <span className="calendar-amount">{entry.amount}</span>
+                            <span className="calendar-amount">{formatPrice(entry.amount)}</span>
                         )}
                     </div>
                 ))}
@@ -146,7 +147,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm }) =
                                     {i.title}
                                 </div>
                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    {i.price && <span>{i.price}</span>}
+                                    {i.price && <span>{formatPrice(i.price)}</span>}
                                     {i.creator?.display_name && <span>• {i.creator.display_name}のリスト</span>}
                                 </div>
                             </div>

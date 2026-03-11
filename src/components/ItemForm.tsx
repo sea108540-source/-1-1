@@ -310,7 +310,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
 
                 <Input
                     label="価格"
-                    placeholder="例: ¥12,800"
+                    placeholder="例: 12,800円"
                     value={price}
                     onChange={e => setPrice(e.target.value)}
                 />
