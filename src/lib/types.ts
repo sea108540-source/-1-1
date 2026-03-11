@@ -19,6 +19,19 @@ export type Item = {
     group?: { id: string; name: string };
     reserved_by?: string | null;
     reserver?: Profile;
+    target_date?: string; // YYYY-MM-DD
+};
+
+export type CalendarEvent = {
+    id: string;
+    creator_id: string;
+    group_id?: string | null;
+    title: string;
+    event_date: string; // YYYY-MM-DD
+    is_annual: boolean;
+    created_at: string;
+    creator?: Profile;
+    group?: { id: string; name: string };
 };
 
 export type Profile = {

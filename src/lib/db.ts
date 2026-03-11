@@ -56,6 +56,7 @@ const mapToDbItem = (item: Item, userId: string) => ({
   group_id: item.group_id || null,
   is_public: item.is_public ?? true,
   reserved_by: item.reserved_by || null,
+  target_date: item.target_date || null,
 });
 
 const mapFromDbItem = (row: any): Item => ({
@@ -76,6 +77,7 @@ const mapFromDbItem = (row: any): Item => ({
   group: row.groups || undefined,
   reserved_by: row.reserved_by || undefined,
   reserver: row.reserver || undefined,
+  target_date: row.target_date || undefined,
 });
 
 // ========================
@@ -491,4 +493,62 @@ export const getGroupItems = async (groupId: string): Promise<Item[]> => {
     creator: profileMap.get(row.user_id) || undefined,
     reserver: profileMap.get(row.reserved_by) || undefined
   }));
+};
+
+// ========================
+// Calendar Events
+// ========================
+
+export const getCalendarEvents = async (): Promise<any[]> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return [];
+
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .select('*, creator:profiles!calendar_events_creator_id_fkey(*), groups(*)')
+    .order('event_date', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching calendar events:', error);
+    return [];
+  }
+  return data || [];
+};
+
+export const addCalendarEvent = async (eventData: Omit<any, 'id' | 'created_at' | 'creator_id'>) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not logged in");
+
+  const { error } = await supabase
+    .from('calendar_events')
+    .insert({
+      ...eventData,
+      creator_id: session.user.id
+    });
+
+  if (error) throw error;
+};
+
+export const updateCalendarEvent = async (id: string, eventData: Partial<any>) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not logged in");
+
+  const { error } = await supabase
+    .from('calendar_events')
+    .update(eventData)
+    .eq('id', id);
+
+  if (error) throw error;
+};
+
+export const deleteCalendarEvent = async (id: string) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not logged in");
+
+  const { error } = await supabase
+    .from('calendar_events')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
 };

@@ -1,17 +1,17 @@
 import React from 'react';
-import { Home as HomeIcon, Users, User, Settings } from 'lucide-react';
+import { Home as HomeIcon, Users, User, Settings, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface BottomNavProps {
-    currentView: 'my-wishlist' | 'friends' | 'groups' | 'settings';
-    onNavigate: (view: 'my-wishlist' | 'friends' | 'groups' | 'settings') => void;
+    currentView: 'my-wishlist' | 'calendar' | 'friends' | 'groups' | 'settings';
+    onNavigate: (view: 'my-wishlist' | 'calendar' | 'friends' | 'groups' | 'settings') => void;
     onAuthRequest: () => void;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ currentView, onNavigate, onAuthRequest }) => {
     const { user } = useAuth();
 
-    const handleNavigate = (view: 'my-wishlist' | 'friends' | 'groups' | 'settings', requiresAuth: boolean) => {
+    const handleNavigate = (view: 'my-wishlist' | 'calendar' | 'friends' | 'groups' | 'settings', requiresAuth: boolean) => {
         if (requiresAuth && !user) {
             onAuthRequest();
         } else {
@@ -42,6 +42,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentView, onNavigate, o
                 label="ホーム" 
                 isActive={currentView === 'my-wishlist'} 
                 onClick={() => handleNavigate('my-wishlist', false)} 
+            />
+            <NavItem 
+                icon={<Calendar size={24} />} 
+                label="カレンダー" 
+                isActive={currentView === 'calendar'} 
+                onClick={() => handleNavigate('calendar', true)} 
             />
             <NavItem 
                 icon={<Users size={24} />} 

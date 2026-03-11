@@ -17,14 +17,19 @@ import { Settings } from './Settings';
 import { MonthlyExpenseChart } from '../components/MonthlyExpenseChart';
 import { BottomNav } from '../components/layout/BottomNav';
 import { FloatingActionButton } from '../components/layout/FloatingActionButton';
+import { CalendarView } from '../components/calendar/CalendarView';
+import { EventForm } from '../components/calendar/EventForm';
+import { addCalendarEvent } from '../lib/db';
 
 export const Home: React.FC = () => {
     const { user } = useAuth();
     const [items, setItems] = useState<Item[]>([]);
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isEventFormOpen, setIsEventFormOpen] = useState(false);
+    const [selectedEventDate, setSelectedEventDate] = useState<Date | undefined>(undefined);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<Item | null>(null);
-    const [currentView, setCurrentView] = useState<'my-wishlist' | 'friends' | 'groups' | 'settings'>('my-wishlist');
+    const [currentView, setCurrentView] = useState<'my-wishlist' | 'calendar' | 'friends' | 'groups' | 'settings'>('my-wishlist');
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
     // Search & Filter state
@@ -176,6 +181,31 @@ export const Home: React.FC = () => {
         const cats = items.map(i => i.category).filter((c): c is string => !!c && c.trim() !== '');
         return ['all', ...Array.from(new Set(cats))];
     }, [items]);
+
+    if (currentView === 'calendar') {
+        return (
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
+                <CalendarView onOpenEventForm={(date) => {
+                    setSelectedEventDate(date);
+                    setIsEventFormOpen(true);
+                }} />
+                
+                <EventForm 
+                    isOpen={isEventFormOpen} 
+                    onClose={() => setIsEventFormOpen(false)} 
+                    onSave={async (eventData) => {
+                        await addCalendarEvent(eventData);
+                        // 雑ですが再レンダリングを促すためviewを切り替えて戻すか、Calendar内部でフェッチさせる
+                        setCurrentView('my-wishlist');
+                        setTimeout(() => setCurrentView('calendar'), 10);
+                    }}
+                    initialDate={selectedEventDate}
+                />
+                
+                <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
+            </div>
+        );
+    }
 
     if (currentView === 'friends') {
         return (

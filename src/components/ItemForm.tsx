@@ -21,6 +21,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
     const [url, setUrl] = useState('');
     const [memo, setMemo] = useState('');
     const [price, setPrice] = useState('');
+    const [targetDate, setTargetDate] = useState('');
     const [category, setCategory] = useState('');
     const [priority, setPriority] = useState<'high' | 'mid' | 'low'>('mid');
     const [image, setImage] = useState<{ type: 'blob' | 'dataUrl' | 'url'; value: string } | undefined>(undefined);
@@ -44,6 +45,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                 setUrl(initialData.url || '');
                 setMemo(initialData.memo || '');
                 setPrice(initialData.price || '');
+                setTargetDate(initialData.target_date || '');
                 setCategory(initialData.category || '');
                 setPriority(initialData.priority || 'mid');
                 setImage(initialData.image);
@@ -54,6 +56,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                 setUrl('');
                 setMemo('');
                 setPrice('');
+                setTargetDate('');
                 setCategory('');
                 setPriority('mid');
                 setImage(undefined);
@@ -115,6 +118,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
             url: url.trim() || undefined,
             memo: memo.trim() || undefined,
             price: price.trim() || undefined,
+            target_date: targetDate || undefined,
             category: category.trim() || undefined,
             priority,
             image,
@@ -261,6 +265,13 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                     autoFocus
+                />
+
+                <Input
+                    label="目標入手日 / 期日（任意）"
+                    type="date"
+                    value={targetDate}
+                    onChange={e => setTargetDate(e.target.value)}
                 />
 
                 <div className="input-group">
