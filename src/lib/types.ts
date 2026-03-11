@@ -58,3 +58,12 @@ export type FriendRequest = {
     created_at: string;
     sender?: Profile;
 };
+
+export type MonthlyBudget = {
+    id: string;
+    user_id: string;
+    month: string; // YYYY-MM
+    budget: number;
+    created_at: string;
+    updated_at: string;
+};

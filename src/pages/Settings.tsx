@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { ArrowLeft, User as UserIcon, LogOut, Download, Plus, Copy } from 'lucide-react';
 import { exportDataAsJsonFile } from '../lib/shareUtils';
-import { getItems } from '../lib/db';
+import { getItems, getMonthlyBudget, setMonthlyBudget } from '../lib/db';
 
 interface SettingsProps {
     onBack: () => void;
@@ -18,6 +18,11 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const [username, setUsername] = useState('');
     const [bio, setBio] = useState('');
     const [birthday, setBirthday] = useState('');
+    const [targetMonth, setTargetMonth] = useState<string>(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const [monthlyBudget, setMonthlyBudgetVal] = useState('');
     const [avatarUrl, setAvatarUrl] = useState('');
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -52,6 +57,20 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
         fetchProfile();
     }, [user]);
+
+    // Fetch budget when targetMonth changes
+    useEffect(() => {
+        const fetchBudget = async () => {
+            if (!user || !targetMonth) return;
+            try {
+                const budget = await getMonthlyBudget(targetMonth);
+                setMonthlyBudgetVal(budget > 0 ? budget.toString() : '');
+            } catch (err) {
+                console.error('Error fetching monthly budget:', err);
+            }
+        };
+        fetchBudget();
+    }, [user, targetMonth]);
 
     const handleSaveProfile = async () => {
         if (!user) return;
@@ -106,6 +125,12 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     throw new Error('このIDは既に使用されています。別のIDをお試しください。');
                 }
                 throw error;
+            }
+
+            // Save the monthly budget
+            if (targetMonth) {
+                const budgetNum = monthlyBudget ? parseInt(monthlyBudget, 10) : 0;
+                await setMonthlyBudget(targetMonth, budgetNum);
             }
 
             setMessage({ type: 'success', text: 'プロフィールを更新しました。' });
@@ -245,6 +270,25 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                         value={birthday}
                         onChange={e => setBirthday(e.target.value)}
                         style={{ colorScheme: 'dark' }}
+                    />
+                </div>
+
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                        <label className="input-label" style={{ margin: 0 }}>予算 (Monthly Budget)</label>
+                        <input 
+                            type="month" 
+                            className="input-field" 
+                            value={targetMonth} 
+                            onChange={e => setTargetMonth(e.target.value)}
+                            style={{ width: 'auto', padding: '0.25rem 0.5rem', fontSize: '0.875rem', colorScheme: 'dark' }}
+                        />
+                    </div>
+                    <Input
+                        type="number"
+                        placeholder="例: 50000"
+                        value={monthlyBudget}
+                        onChange={e => setMonthlyBudgetVal(e.target.value)}
                     />
                 </div>
 

@@ -552,3 +552,57 @@ export const deleteCalendarEvent = async (id: string) => {
 
   if (error) throw error;
 };
+
+// ========================
+// Monthly Budgets
+// ========================
+
+export const getMonthlyBudget = async (month: string): Promise<number> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return 0;
+
+  const { data, error } = await supabase
+    .from('monthly_budgets')
+    .select('budget')
+    .eq('user_id', session.user.id)
+    .eq('month', month)
+    .single();
+
+  if (error || !data) return 0;
+  return data.budget;
+};
+
+export const getMonthlyBudgets = async (months: string[]): Promise<Record<string, number>> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user || months.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('monthly_budgets')
+    .select('month, budget')
+    .eq('user_id', session.user.id)
+    .in('month', months);
+
+  if (error || !data) return {};
+
+  const result: Record<string, number> = {};
+  for (const row of data) {
+    result[row.month] = row.budget;
+  }
+  return result;
+};
+
+export const setMonthlyBudget = async (month: string, budget: number): Promise<void> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not logged in");
+
+  const { error } = await supabase
+    .from('monthly_budgets')
+    .upsert({
+      user_id: session.user.id,
+      month,
+      budget,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id, month' });
+
+  if (error) throw error;
+};

@@ -3,8 +3,8 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { format, isSameDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { getItems, getCalendarEvents } from '../../lib/db';
-import { formatPrice } from '../../lib/utils';
+import { getItems, getCalendarEvents, getMonthlyBudget } from '../../lib/db';
+import { formatPrice, parsePriceString } from '../../lib/utils';
 import type { Item, CalendarEvent } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { Calendar as CalendarIcon, Plus } from 'lucide-react';
@@ -21,6 +21,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm, onI
     const [date, setDate] = useState<Date>(new Date());
     const [items, setItems] = useState<Item[]>([]);
     const [events, setEvents] = useState<CalendarEvent[]>([]);
+    const [activeMonthStr, setActiveMonthStr] = useState<string>(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const [monthlyBudget, setMonthlyBudget] = useState<number>(0);
+
+    useEffect(() => {
+        const fetchBudget = async () => {
+            if (!user) return;
+            try {
+                const budget = await getMonthlyBudget(activeMonthStr);
+                setMonthlyBudget(budget);
+            } catch (err) {
+                console.error("Error fetching monthly budget:", err);
+            }
+        };
+        fetchBudget();
+    }, [user, activeMonthStr]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -111,6 +129,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm, onI
         return isSameDay(eventDate, date);
     });
 
+    const activeMonthTotal = items.filter(i => {
+        if (!i.obtained || !i.obtainedAt) return false;
+        const obtainedDate = new Date(i.obtainedAt);
+        return `${obtainedDate.getFullYear()}-${String(obtainedDate.getMonth() + 1).padStart(2, '0')}` === activeMonthStr;
+    }).reduce((sum, i) => sum + parsePriceString(i.price), 0);
+
     return (
         <div className="calendar-container glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -124,9 +148,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm, onI
             </div>
 
             <div className="calendar-wrapper" style={{ marginBottom: '2rem' }}>
+                {monthlyBudget > 0 && (
+                    <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem', alignItems: 'flex-end', padding: '0 0.5rem' }}>
+                        <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>当月の支出</span>
+                            <span style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--primary)', letterSpacing: '0.02em', lineHeight: 1 }}>
+                                {formatPrice(activeMonthTotal)}
+                            </span>
+                        </div>
+                        <div style={{ textAlign: 'right', borderLeft: '1px solid var(--glass-border)', paddingLeft: '1rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>当月の予算</span>
+                            <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-secondary)', lineHeight: 1 }}>
+                                {formatPrice(monthlyBudget)}
+                            </span>
+                        </div>
+                    </div>
+                )}
                 <Calendar
                     onChange={(val) => setDate(val as Date)}
                     value={date}
+                    onActiveStartDateChange={({ activeStartDate }) => {
+                        if (activeStartDate) {
+                            setActiveMonthStr(`${activeStartDate.getFullYear()}-${String(activeStartDate.getMonth() + 1).padStart(2, '0')}`);
+                        }
+                    }}
+
                     locale="ja-JP"
                     calendarType="gregory"
                     tileContent={tileContent}

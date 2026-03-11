@@ -24,6 +24,7 @@ import { addCalendarEvent } from '../lib/db';
 export const Home: React.FC = () => {
     const { user } = useAuth();
     const [items, setItems] = useState<Item[]>([]);
+    const [monthlyBudget, setMonthlyBudget] = useState<number>(0);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isEventFormOpen, setIsEventFormOpen] = useState(false);
     const [selectedEventDate, setSelectedEventDate] = useState<Date | undefined>(undefined);
@@ -31,6 +32,8 @@ export const Home: React.FC = () => {
     const [editingItem, setEditingItem] = useState<Item | null>(null);
     const [currentView, setCurrentView] = useState<'my-wishlist' | 'calendar' | 'friends' | 'groups' | 'settings'>('my-wishlist');
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [monthlyBudgetsMap, setMonthlyBudgetsMap] = useState<Record<string, number>>({});
+
 
     // Search & Filter state
     const [searchQuery, setSearchQuery] = useState('');
@@ -46,9 +49,31 @@ export const Home: React.FC = () => {
         setItems(data);
     };
 
-    useEffect(() => {
-        loadItems();
+    const loadProfileData = async () => {
+        if (user) {
+            const { getMonthlyBudget } = await import('../lib/db');
+            
+            // Set current month string
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            
+            const budget = await getMonthlyBudget(currentMonthStr);
+            if (budget > 0) {
+                setMonthlyBudget(budget);
+            } else {
+                setMonthlyBudget(0);
+            }
+        }
+    };
 
+    useEffect(() => {
+        if (currentView === 'my-wishlist') {
+            loadItems();
+            loadProfileData();
+        }
+    }, [currentView, user]);
+
+    useEffect(() => {
         // URLからの共有データ復元処理
         const sharedData = parseSharedItemsFromUrl();
         if (sharedData && sharedData.length > 0) {
@@ -171,9 +196,31 @@ export const Home: React.FC = () => {
         return result;
     }, [items, searchQuery, selectedCategory, filterObtained, sortOrder]);
 
+    useEffect(() => {
+        // Fetch budget map for obtained view
+        if (filterObtained === 'obtained' && displayedItems.length > 0) {
+            const monthsToFetch = Array.from(new Set(displayedItems.filter(i => i.obtained).map(item => {
+                const date = new Date(item.obtainedAt || item.createdAt);
+                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            })));
+            
+            if (monthsToFetch.length > 0) {
+                 import('../lib/db').then(({ getMonthlyBudgets }) => {
+                     getMonthlyBudgets(monthsToFetch).then(setMonthlyBudgetsMap);
+                 });
+            }
+        }
+    }, [displayedItems, filterObtained]);
+
     const totalSpent = useMemo(() => {
         return items
             .filter(i => i.obtained)
+            .reduce((sum, item) => sum + parsePriceString(item.price), 0);
+    }, [items]);
+
+    const totalWishlistAmount = useMemo(() => {
+        return items
+            .filter(i => !i.obtained)
             .reduce((sum, item) => sum + parsePriceString(item.price), 0);
     }, [items]);
 
@@ -329,6 +376,61 @@ export const Home: React.FC = () => {
                         </div>
                     )}
 
+                    {/* Budget Overview Panel (Only shown in NOT OBTAINED view) */}
+                    {filterObtained === 'not_obtained' && (
+                        <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                <div>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', display: 'block', marginBottom: '0.25rem' }}>リストの合計金額</span>
+                                    <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.02em', lineHeight: 1 }}>{formatPrice(totalWishlistAmount)}</span>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', display: 'block', marginBottom: '0.25rem' }}>今月の予算</span>
+                                    {monthlyBudget > 0 ? (
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                            <span style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{formatPrice(monthlyBudget)}</span>
+                                            <button 
+                                                onClick={() => setCurrentView('settings')}
+                                                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                                            >
+                                                変更
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                            <span style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-muted)' }}>— 円</span>
+                                            <button 
+                                                onClick={() => setCurrentView('settings')}
+                                                style={{ background: 'none', border: '1px solid var(--primary)', borderRadius: '99px', padding: '0.25rem 0.75rem', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer' }}
+                                            >
+                                                予算を設定する
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            {monthlyBudget > 0 && (
+                                <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden', marginTop: '0.5rem' }}>
+                                    <div 
+                                        style={{ 
+                                            height: '100%', 
+                                            background: totalWishlistAmount > monthlyBudget ? 'var(--danger)' : 'var(--primary)',
+                                            width: `${Math.min((totalWishlistAmount / monthlyBudget) * 100, 100)}%`,
+                                            transition: 'width 0.5s ease',
+                                            borderRadius: '4px'
+                                        }} 
+                                    />
+                                </div>
+                            )}
+                            {monthlyBudget > 0 && totalWishlistAmount > monthlyBudget && (
+                                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--danger)', textAlign: 'right' }}>
+                                    予算を {formatPrice(totalWishlistAmount - monthlyBudget)} オーバーしています
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     {/* Items Grid */}
                     {displayedItems.length > 0 ? (
                         filterObtained === 'obtained' ? (
@@ -347,15 +449,46 @@ export const Home: React.FC = () => {
                                         .map(month => {
                                             const itemsInMonth = grouped[month];
                                             const monthTotal = itemsInMonth.reduce((sum, item) => sum + parsePriceString(item.price), 0);
+                                            const match = month.match(/(\d+)年(\d+)月/);
+                                            const monthRaw = match ? `${match[1]}-${match[2]}` : '';
+                                            const budgetForMonth = monthlyBudgetsMap[monthRaw] || 0;
 
                                             return (
                                                 <div key={month}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                                                         <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)' }}>{month}</h2>
-                                                        <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)', letterSpacing: '0.02em' }}>
-                                                            {formatPrice(monthTotal)}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                            <div style={{ textAlign: 'right' }}>
+                                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>支出合計</span>
+                                                                <span style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)', letterSpacing: '0.02em' }}>
+                                                                    {formatPrice(monthTotal)}
+                                                                </span>
+                                                            </div>
+                                                            {budgetForMonth > 0 && (
+                                                                <div style={{ textAlign: 'right', borderLeft: '1px solid var(--glass-border)', paddingLeft: '1rem' }}>
+                                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>予算</span>
+                                                                    <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                                                        {formatPrice(budgetForMonth)}
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
+                                                    {budgetForMonth > 0 && (
+                                                        <div style={{ marginBottom: '1rem', width: '100%' }}>
+                                                            <div style={{ width: '100%', height: '4px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                                                                <div 
+                                                                    style={{ 
+                                                                        height: '100%', 
+                                                                        background: monthTotal > budgetForMonth ? 'var(--danger)' : 'var(--primary)',
+                                                                        width: `${Math.min((monthTotal / budgetForMonth) * 100, 100)}%`,
+                                                                        transition: 'width 0.5s ease',
+                                                                        borderRadius: '2px'
+                                                                    }} 
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     <div style={{
                                                         display: 'grid',
                                                         gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
