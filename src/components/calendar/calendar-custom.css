@@ -233,3 +233,19 @@
   
   .anniversary-dot { background-color: var(--warning); }
   .item-dot { background-color: var(--success); }
+  .obtained-dot { background-color: var(--text-muted); }
+
+  .label-obtained {
+    color: var(--text-secondary);
+    background-color: transparent;
+    font-style: italic;
+  }
+  .label-obtained::before {
+    background-color: var(--text-muted);
+  }
+
+  .selected-date-details .obtained-card {
+    border-left: 4px solid var(--text-muted);
+    background: rgba(0, 0, 0, 0.03);
+    opacity: 0.9;
+  }

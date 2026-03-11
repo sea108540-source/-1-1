@@ -29,8 +29,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm, onI
                 const fetchedItems = await getItems();
                 const fetchedEvents = await getCalendarEvents();
                 
-                // ターゲット日が設定されているアイテムのみ抽出
-                setItems(fetchedItems.filter(i => i.target_date));
+                // ターゲット日が設定されているか、既に入手済みのアイテムを表示
+                setItems(fetchedItems.filter(i => i.target_date || i.obtained));
                 setEvents(fetchedEvents);
             } catch (err) {
                 console.error("Error fetching calendar data:", err);
@@ -44,7 +44,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm, onI
     const tileContent = ({ date, view }: { date: Date, view: string }) => {
         if (view !== 'month') return null;
 
-        const dayItems = items.filter(i => i.target_date && isSameDay(new Date(i.target_date), date));
+        const dayItems = items.filter(i => {
+            const isTargetDay = i.target_date && isSameDay(new Date(i.target_date), date);
+            const isObtainedDay = i.obtained && i.obtainedAt && isSameDay(new Date(i.obtainedAt), date);
+            return isTargetDay || isObtainedDay;
+        });
         const dayEvents = events.filter(e => {
             const eventDate = new Date(e.event_date);
             if (e.is_annual) {
@@ -57,7 +61,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm, onI
 
         const allDayEntries = [
             ...dayEvents.map(e => ({ id: `e-${e.id}`, title: e.title, type: 'event', amount: null })),
-            ...dayItems.map(i => ({ id: `i-${i.id}`, title: i.title, type: 'item', amount: i.price }))
+            ...dayItems.map(i => {
+                const isObtainedDay = i.obtained && i.obtainedAt && isSameDay(new Date(i.obtainedAt), date);
+                return { 
+                    id: `i-${i.id}`, 
+                    title: isObtainedDay ? `✅ ${i.title}` : i.title, 
+                    type: isObtainedDay ? 'obtained' : 'item', 
+                    amount: i.price 
+                };
+            })
         ];
 
         const MAX_DISPLAY = 3; // スッキリしたので3件までに増やす
@@ -68,7 +80,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm, onI
             <div className="calendar-tile-content-labels">
                 {displayedEntries.map(entry => (
                     <div key={entry.id} className="calendar-item-wrapper">
-                        <div className={`calendar-label ${entry.type === 'event' ? 'label-event' : 'label-item'}`} title={entry.title}>
+                        <div className={`calendar-label ${entry.type === 'event' ? 'label-event' : entry.type === 'obtained' ? 'label-obtained' : 'label-item'}`} title={entry.title}>
                             {entry.title}
                         </div>
                         {entry.amount && (
@@ -86,7 +98,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm, onI
     };
 
     // 選択された日付のアイテムとイベントを取得
-    const selectedDayItems = items.filter(i => i.target_date && isSameDay(new Date(i.target_date), date));
+    const selectedDayItems = items.filter(i => {
+        const isTargetDay = i.target_date && isSameDay(new Date(i.target_date), date);
+        const isObtainedDay = i.obtained && i.obtainedAt && isSameDay(new Date(i.obtainedAt), date);
+        return isTargetDay || isObtainedDay;
+    });
     const selectedDayEvents = events.filter(e => {
         const eventDate = new Date(e.event_date);
         if (e.is_annual) {
@@ -141,23 +157,27 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm, onI
                             </div>
                         ))}
 
-                        {selectedDayItems.map(i => (
-                            <div 
-                                key={i.id} 
-                                className="detail-card item-card" 
-                                onClick={() => onItemClick(i)}
-                                style={{ cursor: 'pointer' }}
-                            >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                    <div className="dot item-dot"></div>
-                                    {i.title}
+                        {selectedDayItems.map(i => {
+                            const isObtainedDay = i.obtained && i.obtainedAt && isSameDay(new Date(i.obtainedAt), date);
+                            return (
+                                <div 
+                                    key={i.id} 
+                                    className={`detail-card item-card ${isObtainedDay ? 'obtained-card' : ''}`} 
+                                    onClick={() => onItemClick(i)}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                        <div className={`dot ${isObtainedDay ? 'obtained-dot' : 'item-dot'}`}></div>
+                                        {isObtainedDay ? `[入手済] ${i.title}` : i.title}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        {i.price && <span>{formatPrice(i.price)}</span>}
+                                        {i.creator?.display_name && <span>• {i.creator.display_name}のリスト</span>}
+                                        {isObtainedDay && <span style={{ color: 'var(--success)', fontWeight: 600 }}>入手完了</span>}
+                                    </div>
                                 </div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    {i.price && <span>{formatPrice(i.price)}</span>}
-                                    {i.creator?.display_name && <span>• {i.creator.display_name}のリスト</span>}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
