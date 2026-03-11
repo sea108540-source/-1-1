@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
     PieChart,
     Pie,
@@ -10,6 +10,9 @@ import {
 } from 'recharts';
 import type { Item } from '../lib/types';
 import { parsePriceString } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
+import { getProfile, updateProfile } from '../lib/db';
+import { Edit2, Save, X } from 'lucide-react';
 
 interface MonthlyExpenseChartProps {
     items: Item[];
@@ -71,13 +74,35 @@ const renderActiveShape = (props: any) => {
 };
 
 export const MonthlyExpenseChart: React.FC<MonthlyExpenseChartProps> = ({ items }) => {
+    const { user } = useAuth();
     const [activeIndex, setActiveIndex] = useState(0);
+    const [budget, setBudget] = useState<number | null>(null);
+    const [isEditingBudget, setIsEditingBudget] = useState(false);
+    const [budgetInput, setBudgetInput] = useState('');
+
+    useEffect(() => {
+        if (user) {
+            getProfile(user.id).then(profile => {
+                if (profile && profile.monthly_budget != null) {
+                    setBudget(profile.monthly_budget);
+                    setBudgetInput(profile.monthly_budget.toString());
+                }
+            });
+        }
+    }, [user]);
+
+    const handleSaveBudget = async () => {
+        if (!user) return;
+        const newBudget = parseInt(budgetInput, 10);
+        const finalBudget = isNaN(newBudget) ? 0 : newBudget;
+        await updateProfile({ id: user.id, monthly_budget: finalBudget });
+        setBudget(finalBudget);
+        setIsEditingBudget(false);
+    };
 
     const onPieEnter = (_: any, index: number) => {
         setActiveIndex(index);
     };
-
-    const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
     // 存在する月（YYYY年MM月）のリストを抽出
     const availableMonths = useMemo(() => {
@@ -90,6 +115,13 @@ export const MonthlyExpenseChart: React.FC<MonthlyExpenseChartProps> = ({ items 
         });
         return Array.from(months).sort((a, b) => b.localeCompare(a)); // 新しい順
     }, [items]);
+
+    const [selectedMonth, setSelectedMonth] = useState<string>('all');
+    useEffect(() => {
+        if (selectedMonth === 'all' && availableMonths.length > 0) {
+            setSelectedMonth(availableMonths[0]);
+        }
+    }, [availableMonths]);
 
     const chartData = useMemo(() => {
         // 入手済みのアイテムのみを対象とする
@@ -131,9 +163,8 @@ export const MonthlyExpenseChart: React.FC<MonthlyExpenseChartProps> = ({ items 
 
     }, [items, selectedMonth]);
 
-    if (items.filter(item => item.obtained).length === 0) {
-        return null; // 全体の入手済みデータがない場合は何も表示しない
-    }
+    // グラフ全体を表示しない条件を削除し、常に予算UIは表示させる
+    // 取得したアイテムがない場合の円グラフエリアの表示は下部で処理する
 
     const totalAmount = chartData.reduce((sum, item) => sum + item.value, 0);
 
@@ -171,7 +202,8 @@ export const MonthlyExpenseChart: React.FC<MonthlyExpenseChartProps> = ({ items 
     return (
         <div style={{
             width: '100%',
-            height: '480px', // ドロップダウンの分少し高さを広げる
+            height: '550px', // 予算プログレスバー用に高さを広げる
+            minHeight: '480px',
             background: 'var(--glass-bg)',
             border: '1px solid var(--glass-border)',
             borderRadius: 'var(--radius-lg)',
@@ -180,6 +212,54 @@ export const MonthlyExpenseChart: React.FC<MonthlyExpenseChartProps> = ({ items 
             display: 'flex',
             flexDirection: 'column'
         }}>
+            {/* 予算設定・進捗エリア */}
+            <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>月の予算</span>
+                        {isEditingBudget ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <input
+                                    type="number"
+                                    value={budgetInput}
+                                    onChange={e => setBudgetInput(e.target.value)}
+                                    style={{ padding: '0.25rem 0.5rem', borderRadius: '4px', border: '1px solid var(--glass-border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', width: '100px', outline: 'none' }}
+                                    autoFocus
+                                    placeholder="金額"
+                                />
+                                <button onClick={handleSaveBudget} style={{ background: 'var(--primary)', border: 'none', borderRadius: '4px', cursor: 'pointer', color: 'white', padding: '4px 8px', display: 'flex', alignItems: 'center' }}><Save size={14} /></button>
+                                <button onClick={() => { setIsEditingBudget(false); setBudgetInput(budget?.toString() || ''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex' }}><X size={16} /></button>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '1.1rem' }}>{budget != null && budget > 0 ? `¥${budget.toLocaleString()}` : '未設定'}</span>
+                                <button onClick={() => setIsEditingBudget(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', display: 'flex', borderRadius: '4px' }}><Edit2 size={14} /></button>
+                            </div>
+                        )}
+                    </div>
+                    {budget != null && budget > 0 && selectedMonth !== 'all' && (
+                        <div style={{ fontSize: '0.875rem', color: totalAmount > budget ? 'var(--danger)' : 'var(--text-secondary)' }}>
+                            使用額: ¥{totalAmount.toLocaleString()} <span style={{ opacity: 0.7 }}>(残り: ¥{Math.max(0, budget - totalAmount).toLocaleString()})</span>
+                        </div>
+                    )}
+                    {budget != null && budget > 0 && selectedMonth === 'all' && (
+                        <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                            月を選択すると進捗が表示されます
+                        </div>
+                    )}
+                </div>
+                {budget != null && budget > 0 && selectedMonth !== 'all' && (
+                    <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{
+                            height: '100%',
+                            width: `${Math.min(100, (totalAmount / budget) * 100)}%`,
+                            background: totalAmount > budget ? 'var(--danger)' : 'var(--primary)',
+                            transition: 'width 0.3s ease'
+                        }} />
+                    </div>
+                )}
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                     <h3 style={{ marginTop: 0, marginBottom: '0.25rem', fontSize: '1.1rem', color: 'var(--text-secondary)' }}>

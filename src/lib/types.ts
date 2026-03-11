@@ -28,6 +28,7 @@ export type Profile = {
     avatar_url: string | null;
     bio?: string | null;
     birthday?: string | null;
+    monthly_budget?: number | null;
     updated_at?: string;
 };
 

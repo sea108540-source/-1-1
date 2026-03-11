@@ -331,12 +331,17 @@ export const Home: React.FC = () => {
                 </button>
             </div>
 
-            {filterObtained === 'obtained' && totalSpent > 0 && (
-                <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>入手済みの総支出額:</span>
-                    <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '0.02em' }}>
-                        ¥{totalSpent.toLocaleString()}
-                    </span>
+            {filterObtained === 'obtained' && (
+                <div style={{ marginBottom: '2rem' }}>
+                    <MonthlyExpenseChart items={items} />
+                    {totalSpent > 0 && (
+                        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>入手済みの総支出額:</span>
+                            <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '0.02em' }}>
+                                ¥{totalSpent.toLocaleString()}
+                            </span>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -373,7 +378,7 @@ export const Home: React.FC = () => {
             {displayedItems.length > 0 ? (
                 filterObtained === 'obtained' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-                        <MonthlyExpenseChart items={displayedItems} />
+                        {/* MonthlyExpenseChart moved to top */}
                         {(() => {
                             const grouped = displayedItems.reduce((acc, item) => {
                                 const date = new Date(item.obtainedAt || item.createdAt);

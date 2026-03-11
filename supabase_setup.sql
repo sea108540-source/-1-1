@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   avatar_url text,
   bio text,
   birthday date,
+  monthly_budget integer DEFAULT 0,
   updated_at timestamp with time zone DEFAULT now()
 );
 
@@ -14,6 +15,9 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='birthday') THEN
     ALTER TABLE public.profiles ADD COLUMN birthday date;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='monthly_budget') THEN
+    ALTER TABLE public.profiles ADD COLUMN monthly_budget integer DEFAULT 0;
   END IF;
 END $$;
 
