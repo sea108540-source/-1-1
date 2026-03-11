@@ -8,16 +8,18 @@ import { parsePriceString } from '../lib/utils';
 import { AuthModal } from '../components/AuthModal';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, Search, Share2, Upload, Check, User as UserIcon, Users, Settings as SettingsIcon } from 'lucide-react';
+import { Check, Share2, Upload, Search } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../contexts/AuthContext';
 import { FriendManager } from '../components/friends/FriendManager';
 import { GroupManager } from '../components/groups/GroupManager';
 import { Settings } from './Settings';
 import { MonthlyExpenseChart } from '../components/MonthlyExpenseChart';
+import { BottomNav } from '../components/layout/BottomNav';
+import { FloatingActionButton } from '../components/layout/FloatingActionButton';
 
 export const Home: React.FC = () => {
-    const { user, loading: authLoading } = useAuth();
+    const { user } = useAuth();
     const [items, setItems] = useState<Item[]>([]);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -177,30 +179,34 @@ export const Home: React.FC = () => {
 
     if (currentView === 'friends') {
         return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 80px 1rem' }}>
                 <FriendManager onBack={() => setCurrentView('my-wishlist')} />
+                <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
             </div>
         );
     }
 
     if (currentView === 'groups') {
         return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 80px 1rem' }}>
                 <GroupManager onBack={() => setCurrentView('my-wishlist')} />
+                <FloatingActionButton onClick={() => { setEditingItem(null); setIsFormOpen(true); }} visible={true} />
+                <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
             </div>
         );
     }
 
     if (currentView === 'settings') {
         return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 80px 1rem' }}>
                 <Settings onBack={() => setCurrentView('my-wishlist')} />
+                <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
             </div>
         );
     }
 
     return (
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
 
             {/* Header Area */}
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -208,55 +214,12 @@ export const Home: React.FC = () => {
                     <h1 className="text-gradient" style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
                         Wishlist
                     </h1>
-                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>欲しいものリストを管理・共有</p>
+                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>欲しいものリストを管理</p>
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
 
-                    {/* Groups Button */}
-                    <Button
-                        variant="secondary"
-                        icon={<Users size={18} />}
-                        onClick={() => {
-                            if (user) {
-                                setCurrentView('groups');
-                            } else {
-                                setIsAuthModalOpen(true);
-                            }
-                        }}
-                    >
-                        グループ
-                    </Button>
-
-                    {/* Friends Button - Always visible */}
-                    <Button
-                        variant="secondary"
-                        icon={<UserIcon size={18} />}
-                        onClick={() => {
-                            if (user) {
-                                setCurrentView('friends');
-                            } else {
-                                setIsAuthModalOpen(true);
-                            }
-                        }}
-                    >
-                        友達
-                    </Button>
-
-                    {/* Auth Display Area */}
-                    {!authLoading && user ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}>
-                            <Button variant="ghost" size="sm" onClick={() => setCurrentView('settings')} title="設定">
-                                <SettingsIcon size={20} />
-                            </Button>
-                        </div>
-                    ) : (
-                        <Button variant="secondary" size="md" onClick={() => setIsAuthModalOpen(true)} style={{ marginRight: '0.5rem' }}>
-                            ログイン
-                        </Button>
-                    )}
-
-                    {/* Action Buttons */}
+                    {/* Action Buttons (Share/Import) */}
                     <DropdownActionButtons
                         onShare={handleShareLink}
                         copySuccess={copySuccess}
@@ -264,10 +227,6 @@ export const Home: React.FC = () => {
                     />
 
                     <input type="file" accept=".json" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImport} />
-
-                    <Button variant="primary" icon={<Plus size={18} />} onClick={() => { setEditingItem(null); setIsFormOpen(true); }} style={{ flex: '1 1 auto' }}>
-                        追加
-                    </Button>
                 </div>
             </header>
 
@@ -472,6 +431,12 @@ export const Home: React.FC = () => {
                 isOpen={isAuthModalOpen}
                 onClose={() => setIsAuthModalOpen(false)}
             />
+
+            {/* Floating Action Button for adding items */}
+            <FloatingActionButton onClick={() => { setEditingItem(null); setIsFormOpen(true); }} visible={currentView === 'my-wishlist'} />
+
+            {/* Bottom Navigation */}
+            <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
 
         </div>
     );

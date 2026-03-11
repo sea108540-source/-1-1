@@ -138,25 +138,20 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, currentUserId, onToggl
                                 </div>
                             )}
 
-                            {/* 入手済みトグルボタン: 
-                                自分が作成者(isCreator) なら常に操作可能。
-                                自分が予約者(isReservedByMe) なら操作可能。
-                                それ以外(予約されていない他人のアイテム、他人が予約中のアイテム等)は「入手済みにする」操作はできない(もしくは表示だけ)
-                            */}
+                            {/* 入手済みトグルボタン */}
                             {(isCreator || isReservedByMe || item.obtained) && (
                                 <button
                                     className={`btn btn-sm ${item.obtained ? 'btn-ghost' : 'btn-secondary'}`}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        // 他人のアイテムで予約もしていないのに押せないようにする（念のため）
                                         if (isCreator || isReservedByMe) {
                                             onToggleObtained(item.id, item.obtained);
                                         }
                                     }}
                                     disabled={!isCreator && !isReservedByMe}
-                                    style={{ padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: (!isCreator && !isReservedByMe && !item.obtained) ? 0.5 : 1 }}
+                                    style={{ padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: (!isCreator && !isReservedByMe && !item.obtained) ? 0.5 : 1, fontSize: '0.8rem' }}
                                 >
-                                    <CheckCircle2 size={16} color={item.obtained ? 'var(--success)' : 'inherit'} />
+                                    <CheckCircle2 size={14} color={item.obtained ? 'var(--success)' : 'inherit'} />
                                     {item.obtained ? '入手済み' : (isReservedByMe ? 'プレゼントした' : '未入手')}
                                 </button>
                             )}
