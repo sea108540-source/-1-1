@@ -182,276 +182,239 @@ export const Home: React.FC = () => {
         return ['all', ...Array.from(new Set(cats))];
     }, [items]);
 
-    if (currentView === 'calendar') {
-        return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
-                <CalendarView 
-                    onOpenEventForm={(date) => {
-                        setSelectedEventDate(date);
-                        setIsEventFormOpen(true);
-                    }} 
-                    onItemClick={(item) => {
-                        setEditingItem(item);
-                        setIsFormOpen(true);
-                    }}
-                />
-
-                <div style={{ marginTop: '2rem' }}>
-                    <MonthlyExpenseChart items={items} />
-                    {totalSpent > 0 && (
-                        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>入手済みの総支出額:</span>
-                            <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '0.02em' }}>
-                                {formatPrice(totalSpent)}
-                            </span>
-                        </div>
-                    )}
-                </div>
-                <EventForm 
-                    isOpen={isEventFormOpen} 
-                    onClose={() => setIsEventFormOpen(false)} 
-                    onSave={async (eventData) => {
-                        await addCalendarEvent(eventData);
-                        // 雑ですが再レンダリングを促すためviewを切り替えて戻すか、Calendar内部でフェッチさせる
-                        setCurrentView('my-wishlist');
-                        setTimeout(() => setCurrentView('calendar'), 10);
-                    }}
-                    initialDate={selectedEventDate}
-                />
-                
-                <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
-            </div>
-        );
-    }
-
-    if (currentView === 'friends') {
-        return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
-                <FriendManager onBack={() => setCurrentView('my-wishlist')} />
-                <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
-            </div>
-        );
-    }
-
-    if (currentView === 'groups') {
-        return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
-                <GroupManager onBack={() => setCurrentView('my-wishlist')} />
-                <FloatingActionButton onClick={() => { setEditingItem(null); setIsFormOpen(true); }} visible={true} />
-                <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
-            </div>
-        );
-    }
-
-    if (currentView === 'settings') {
-        return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
-                <Settings onBack={() => setCurrentView('my-wishlist')} />
-                <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
-            </div>
-        );
-    }
-
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
 
-            {/* Header Area */}
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                    <h1 className="text-gradient" style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
-                        Wishlist
-                    </h1>
-                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>欲しいものリストを管理</p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-
-                    {/* Action Buttons (Share/Import) */}
-                    <DropdownActionButtons
-                        onShare={handleShareLink}
-                        copySuccess={copySuccess}
-                        onImportClick={() => fileInputRef.current?.click()}
+            {/* Main Content Areas */}
+            {currentView === 'calendar' && (
+                <>
+                    <CalendarView 
+                        onOpenEventForm={(date) => {
+                            setSelectedEventDate(date);
+                            setIsEventFormOpen(true);
+                        }} 
+                        onItemClick={(item) => {
+                            setEditingItem(item);
+                            setIsFormOpen(true);
+                        }}
                     />
 
-                    <input type="file" accept=".json" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImport} />
-                </div>
-            </header>
-
-            {/* Control Panel (Search, Filter, Sort) */}
-            <div className="glass-panel" style={{ padding: '1rem', marginBottom: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ flex: '1 1 300px' }}>
-                    <Input
-                        placeholder="タイトルやメモで検索..."
-                        icon={<Search size={18} />}
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                    />
-                </div>
-
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div className="input-wrapper" style={{ minWidth: '120px' }}>
-                        <select className="input-field" value={sortOrder} onChange={e => setSortOrder(e.target.value as any)}>
-                            <option value="newest">新しい順</option>
-                            <option value="oldest">古い順</option>
-                            <option value="priority">優先度 (高→低)</option>
-                        </select>
+                    <div style={{ marginTop: '2rem' }}>
+                        <MonthlyExpenseChart items={items} />
+                        {totalSpent > 0 && (
+                            <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>入手済みの総支出額:</span>
+                                <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '0.02em' }}>
+                                    {formatPrice(totalSpent)}
+                                </span>
+                            </div>
+                        )}
                     </div>
-                </div>
-            </div>
+                </>
+            )}
 
-            {/* Main Tabs (Not Obtained / Obtained) */}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--glass-border)' }}>
-                <button
-                    onClick={() => setFilterObtained('not_obtained')}
-                    style={{
-                        padding: '0.75rem 1.5rem',
-                        fontSize: '1rem',
-                        fontWeight: filterObtained === 'not_obtained' ? 600 : 400,
-                        color: filterObtained === 'not_obtained' ? 'var(--primary)' : 'var(--text-secondary)',
-                        background: 'none',
-                        border: 'none',
-                        borderBottom: filterObtained === 'not_obtained' ? '2px solid var(--primary)' : '2px solid transparent',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        marginBottom: '-1px'
-                    }}
-                >
-                    欲しいもの
-                </button>
-                <button
-                    onClick={() => setFilterObtained('obtained')}
-                    style={{
-                        padding: '0.75rem 1.5rem',
-                        fontSize: '1rem',
-                        fontWeight: filterObtained === 'obtained' ? 600 : 400,
-                        color: filterObtained === 'obtained' ? 'var(--primary)' : 'var(--text-secondary)',
-                        background: 'none',
-                        border: 'none',
-                        borderBottom: filterObtained === 'obtained' ? '2px solid var(--primary)' : '2px solid transparent',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        marginBottom: '-1px'
-                    }}
-                >
-                    入手済み（履歴）
-                </button>
-            </div>
+            {currentView === 'friends' && <FriendManager onBack={() => setCurrentView('my-wishlist')} />}
+            
+            {currentView === 'groups' && <GroupManager onBack={() => setCurrentView('my-wishlist')} />}
+            
+            {currentView === 'settings' && <Settings onBack={() => setCurrentView('my-wishlist')} />}
 
+            {currentView === 'my-wishlist' && (
+                <>
+                    {/* Header Area */}
+                    <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+                        <div>
+                            <h1 className="text-gradient" style={{ fontSize: '2.5rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
+                                Wishlist
+                            </h1>
+                            <p style={{ color: 'var(--text-secondary)', margin: 0 }}>欲しいものリストを管理</p>
+                        </div>
 
-            {/* Category Filter Pills */}
-            {categories.length > 1 && (
-                <div style={{
-                    display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem', marginBottom: '1.5rem',
-                    scrollbarWidth: 'none', msOverflowStyle: 'none'
-                }} className="hide-scroll">
-                    {categories.map(cat => (
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <DropdownActionButtons
+                                onShare={handleShareLink}
+                                copySuccess={copySuccess}
+                                onImportClick={() => fileInputRef.current?.click()}
+                            />
+                            <input type="file" accept=".json" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImport} />
+                        </div>
+                    </header>
+
+                    {/* Control Panel (Search, Filter, Sort) */}
+                    <div className="glass-panel" style={{ padding: '1rem', marginBottom: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div style={{ flex: '1 1 300px' }}>
+                            <Input
+                                placeholder="タイトルやメモで検索..."
+                                icon={<Search size={18} />}
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <div className="input-wrapper" style={{ minWidth: '120px' }}>
+                                <select className="input-field" value={sortOrder} onChange={e => setSortOrder(e.target.value as any)}>
+                                    <option value="newest">新しい順</option>
+                                    <option value="oldest">古い順</option>
+                                    <option value="priority">優先度 (高→低)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Tabs (Not Obtained / Obtained) */}
+                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--glass-border)' }}>
                         <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
+                            onClick={() => setFilterObtained('not_obtained')}
                             style={{
-                                padding: '0.4rem 1.2rem',
-                                borderRadius: '99px',
-                                background: selectedCategory === cat ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
-                                color: selectedCategory === cat ? 'white' : 'var(--text-secondary)',
-                                border: '1px solid ' + (selectedCategory === cat ? 'var(--primary)' : 'var(--glass-border)'),
+                                padding: '0.75rem 1.5rem',
+                                fontSize: '1rem',
+                                fontWeight: filterObtained === 'not_obtained' ? 600 : 400,
+                                color: filterObtained === 'not_obtained' ? 'var(--primary)' : 'var(--text-secondary)',
+                                background: 'none',
+                                border: 'none',
+                                borderBottom: filterObtained === 'not_obtained' ? '2px solid var(--primary)' : '2px solid transparent',
                                 cursor: 'pointer',
-                                whiteSpace: 'nowrap',
-                                fontSize: '0.875rem',
                                 transition: 'all 0.2s ease',
-                                fontWeight: selectedCategory === cat ? 600 : 400
+                                marginBottom: '-1px'
                             }}
                         >
-                            {cat === 'all' ? 'すべて' : cat}
+                            欲しいもの
                         </button>
-                    ))}
-                </div>
-            )}
+                        <button
+                            onClick={() => setFilterObtained('obtained')}
+                            style={{
+                                padding: '0.75rem 1.5rem',
+                                fontSize: '1rem',
+                                fontWeight: filterObtained === 'obtained' ? 600 : 400,
+                                color: filterObtained === 'obtained' ? 'var(--primary)' : 'var(--text-secondary)',
+                                background: 'none',
+                                border: 'none',
+                                borderBottom: filterObtained === 'obtained' ? '2px solid var(--primary)' : '2px solid transparent',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                marginBottom: '-1px'
+                            }}
+                        >
+                            入手済み（履歴）
+                        </button>
+                    </div>
 
-            {/* Items Grid */}
-            {displayedItems.length > 0 ? (
-                filterObtained === 'obtained' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-                        {/* MonthlyExpenseChart moved to top */}
-                        {(() => {
-                            const grouped = displayedItems.reduce((acc, item) => {
-                                const date = new Date(item.obtainedAt || item.createdAt);
-                                const monthKey = `${date.getFullYear()}年${String(date.getMonth() + 1).padStart(2, '0')}月`;
-                                if (!acc[monthKey]) acc[monthKey] = [];
-                                acc[monthKey].push(item);
-                                return acc;
-                            }, {} as Record<string, typeof displayedItems>);
+                    {/* Category Filter Pills */}
+                    {categories.length > 1 && (
+                        <div style={{
+                            display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem', marginBottom: '1.5rem',
+                            scrollbarWidth: 'none', msOverflowStyle: 'none'
+                        }} className="hide-scroll">
+                            {categories.map(cat => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setSelectedCategory(cat)}
+                                    style={{
+                                        padding: '0.4rem 1.2rem',
+                                        borderRadius: '99px',
+                                        background: selectedCategory === cat ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
+                                        color: selectedCategory === cat ? 'white' : 'var(--text-secondary)',
+                                        border: '1px solid ' + (selectedCategory === cat ? 'var(--primary)' : 'var(--glass-border)'),
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                        fontSize: '0.875rem',
+                                        transition: 'all 0.2s ease',
+                                        fontWeight: selectedCategory === cat ? 600 : 400
+                                    }}
+                                >
+                                    {cat === 'all' ? 'すべて' : cat}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
-                            return Object.keys(grouped)
-                                .sort((a, b) => b.localeCompare(a)) // Descending order of months
-                                .map(month => {
-                                    const itemsInMonth = grouped[month];
-                                    const monthTotal = itemsInMonth.reduce((sum, item) => sum + parsePriceString(item.price), 0);
+                    {/* Items Grid */}
+                    {displayedItems.length > 0 ? (
+                        filterObtained === 'obtained' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+                                {(() => {
+                                    const grouped = displayedItems.reduce((acc, item) => {
+                                        const date = new Date(item.obtainedAt || item.createdAt);
+                                        const monthKey = `${date.getFullYear()}年${String(date.getMonth() + 1).padStart(2, '0')}月`;
+                                        if (!acc[monthKey]) acc[monthKey] = [];
+                                        acc[monthKey].push(item);
+                                        return acc;
+                                    }, {} as Record<string, typeof displayedItems>);
 
-                                    return (
-                                        <div key={month}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>
-                                                <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)' }}>{month}</h2>
-                                                <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)', letterSpacing: '0.02em' }}>
-                                                    {formatPrice(monthTotal)}
+                                    return Object.keys(grouped)
+                                        .sort((a, b) => b.localeCompare(a)) // Descending order of months
+                                        .map(month => {
+                                            const itemsInMonth = grouped[month];
+                                            const monthTotal = itemsInMonth.reduce((sum, item) => sum + parsePriceString(item.price), 0);
+
+                                            return (
+                                                <div key={month}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>
+                                                        <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-primary)' }}>{month}</h2>
+                                                        <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)', letterSpacing: '0.02em' }}>
+                                                            {formatPrice(monthTotal)}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        display: 'grid',
+                                                        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
+                                                        gap: '1rem'
+                                                    }}>
+                                                        {itemsInMonth.map(item => (
+                                                            <ItemCard
+                                                                key={item.id}
+                                                                item={item}
+                                                                currentUserId={user?.id}
+                                                                onReserve={async () => { }}
+                                                                onCancelReservation={async () => { }}
+                                                                onToggleObtained={handleToggleObtained}
+                                                                onClick={(item) => {
+                                                                    setEditingItem(item);
+                                                                    setIsFormOpen(true);
+                                                                }}
+                                                            />
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div style={{
-                                                display: 'grid',
-                                                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
-                                                gap: '1rem'
-                                            }}>
-                                                {itemsInMonth.map(item => (
-                                                    <ItemCard
-                                                        key={item.id}
-                                                        item={item}
-                                                        currentUserId={user?.id}
-                                                        onReserve={async () => { }}
-                                                        onCancelReservation={async () => { }}
-                                                        onToggleObtained={handleToggleObtained}
-                                                        onClick={(item) => {
-                                                            setEditingItem(item);
-                                                            setIsFormOpen(true);
-                                                        }}
-                                                    />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    );
-                                });
-                        })()}
-                    </div>
-                ) : (
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
-                        gap: '1rem'
-                    }}>
-                        {displayedItems.map(item => (
-                            <ItemCard
-                                key={item.id}
-                                item={item}
-                                currentUserId={user?.id}
-                                onReserve={async () => { }}
-                                onCancelReservation={async () => { }}
-                                onToggleObtained={handleToggleObtained}
-                                onClick={(item) => {
-                                    setEditingItem(item);
-                                    setIsFormOpen(true);
-                                }}
-                            />
-                        ))}
-                    </div>
-                )
-            ) : (
-                <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)' }}>
-                    <p style={{ fontSize: '1.125rem' }}>アイテムが見つかりません</p>
-                    <Button variant="ghost" onClick={() => { setEditingItem(null); setIsFormOpen(true); }} style={{ marginTop: '1rem' }}>
-                        + 最初のアイテムを追加する
-                    </Button>
-                </div>
+                                            );
+                                        });
+                                })()}
+                            </div>
+                        ) : (
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
+                                gap: '1rem'
+                            }}>
+                                {displayedItems.map(item => (
+                                    <ItemCard
+                                        key={item.id}
+                                        item={item}
+                                        currentUserId={user?.id}
+                                        onReserve={async () => { }}
+                                        onCancelReservation={async () => { }}
+                                        onToggleObtained={handleToggleObtained}
+                                        onClick={(item) => {
+                                            setEditingItem(item);
+                                            setIsFormOpen(true);
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)' }}>
+                            <p style={{ fontSize: '1.125rem' }}>アイテムが見つかりません</p>
+                            <button className="btn btn-ghost" onClick={() => { setEditingItem(null); setIsFormOpen(true); }} style={{ marginTop: '1rem' }}>
+                                + 最初のアイテムを追加する
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
 
-            {/* フォームモーダル */}
+            {/* Global Modals & Components */}
             <ItemForm
                 isOpen={isFormOpen}
                 onClose={() => { setIsFormOpen(false); setEditingItem(null); }}
@@ -460,18 +423,30 @@ export const Home: React.FC = () => {
                 initialData={editingItem}
             />
 
-            {/* 認証モーダル */}
+            <EventForm 
+                isOpen={isEventFormOpen} 
+                onClose={() => setIsEventFormOpen(false)} 
+                onSave={async (eventData) => {
+                    await addCalendarEvent(eventData);
+                    // 雑ですが再レンダリングを促すためviewを切り替えて戻すか、Calendar内部でフェッチさせる
+                    const prevView = currentView;
+                    setCurrentView('my-wishlist');
+                    setTimeout(() => setCurrentView(prevView), 10);
+                }}
+                initialDate={selectedEventDate}
+            />
+
             <AuthModal
                 isOpen={isAuthModalOpen}
                 onClose={() => setIsAuthModalOpen(false)}
             />
 
-            {/* Floating Action Button for adding items */}
-            <FloatingActionButton onClick={() => { setEditingItem(null); setIsFormOpen(true); }} visible={currentView === 'my-wishlist'} />
+            <FloatingActionButton 
+                onClick={() => { setEditingItem(null); setIsFormOpen(true); }} 
+                visible={['my-wishlist', 'groups'].includes(currentView)} 
+            />
 
-            {/* Bottom Navigation */}
             <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
-
         </div>
     );
 };
