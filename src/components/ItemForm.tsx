@@ -30,6 +30,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
     const [isPublic, setIsPublic] = useState(true);
     const [groups, setGroups] = useState<Group[]>([]);
     const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+    const [isObtained, setIsObtained] = useState(false);
+    const [obtainedDate, setObtainedDate] = useState('');
 
     useEffect(() => {
         const fetchGroups = async () => {
@@ -52,6 +54,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                 setImage(initialData.image);
                 setIsPublic(initialData.is_public ?? true);
                 setSelectedGroupId(initialData.group_id || groupId || '');
+                setIsObtained(initialData.obtained || false);
+                setObtainedDate(initialData.obtainedAt ? new Date(initialData.obtainedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
             } else {
                 setTitle('');
                 setUrl('');
@@ -64,6 +68,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                 setIsFetchingMetadata(false);
                 setIsPublic(true);
                 setSelectedGroupId(groupId || '');
+                setIsObtained(false);
+                setObtainedDate(new Date().toISOString().split('T')[0]);
             }
         }
     }, [isOpen, initialData]);
@@ -124,8 +130,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
             priority,
             image,
             createdAt: initialData?.createdAt || Date.now(),
-            obtained: initialData?.obtained || false,
-            obtainedAt: initialData?.obtainedAt,
+            obtained: isObtained,
+            obtainedAt: isObtained ? new Date(obtainedDate).getTime() : undefined,
             group_id: selectedGroupId || undefined,
             is_public: isPublic,
         };
@@ -375,6 +381,32 @@ export const ItemForm: React.FC<ItemFormProps> = ({ isOpen, onClose, onSave, onD
                         </label>
                     </div>
                 )}
+
+                <div style={{ borderTop: '1px solid var(--glass-border)', marginTop: '0.5rem', paddingTop: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <input
+                            type="checkbox"
+                            id="is-obtained-toggle"
+                            checked={isObtained}
+                            onChange={(e) => setIsObtained(e.target.checked)}
+                            disabled={readOnly}
+                            style={{ width: '16px', height: '16px', accentColor: 'var(--success)', cursor: readOnly ? 'default' : 'pointer' }}
+                        />
+                        <label htmlFor="is-obtained-toggle" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--success)', cursor: readOnly ? 'default' : 'pointer', userSelect: 'none' }}>
+                            すでに入手済み（購入済み）
+                        </label>
+                    </div>
+                    {isObtained && (
+                        <Input
+                            label="入手日（購入日）"
+                            type="date"
+                            value={obtainedDate}
+                            onChange={e => setObtainedDate(e.target.value)}
+                            readOnly={readOnly}
+                            style={{ maxWidth: '200px' }}
+                        />
+                    )}
+                </div>
 
             </div>
         </Modal>
