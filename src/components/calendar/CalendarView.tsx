@@ -54,19 +54,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm }) =
         if (dayItems.length === 0 && dayEvents.length === 0) return null;
 
         const allDayEntries = [
-            ...dayEvents.map(e => ({ id: `e-${e.id}`, title: e.title, type: 'event' })),
-            ...dayItems.map(i => ({ id: `i-${i.id}`, title: i.title, type: 'item' }))
+            ...dayEvents.map(e => ({ id: `e-${e.id}`, title: e.title, type: 'event', amount: null })),
+            ...dayItems.map(i => ({ id: `i-${i.id}`, title: i.title, type: 'item', amount: i.price }))
         ];
 
-        const MAX_DISPLAY = 2; // 表示する最大件数
+        const MAX_DISPLAY = 3; // スッキリしたので3件までに増やす
         const displayedEntries = allDayEntries.slice(0, MAX_DISPLAY);
         const remainingCount = allDayEntries.length - MAX_DISPLAY;
 
         return (
             <div className="calendar-tile-content-labels">
                 {displayedEntries.map(entry => (
-                    <div key={entry.id} className={`calendar-label ${entry.type === 'event' ? 'label-event' : 'label-item'}`} title={entry.title}>
-                        {entry.title}
+                    <div key={entry.id} className="calendar-item-wrapper">
+                        <div className={`calendar-label ${entry.type === 'event' ? 'label-event' : 'label-item'}`} title={entry.title}>
+                            {entry.title}
+                        </div>
+                        {entry.amount && (
+                            <span className="calendar-amount">{entry.amount}</span>
+                        )}
                     </div>
                 ))}
                 {remainingCount > 0 && (
@@ -105,6 +110,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenEventForm }) =
                     onChange={(val) => setDate(val as Date)}
                     value={date}
                     locale="ja-JP"
+                    calendarType="gregory"
                     tileContent={tileContent}
                     className="custom-react-calendar"
                     formatDay={(_, date) => format(date, 'd')}

@@ -41,103 +41,172 @@
     color: var(--text-secondary);
     text-transform: uppercase;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--glass-border);
-    margin-bottom: 0.5rem;
+    /* border-bottom: 1px solid var(--glass-border); 削除して曜日もグリッドに合わせる */
   }
   
   .custom-react-calendar .react-calendar__month-view__weekdays__weekday abbr {
     text-decoration: none;
   }
+
+  /* 曜日の色付け */
+  .custom-react-calendar .react-calendar__month-view__weekdays__weekday:first-child { color: var(--danger); } /* 日曜 */
+  .custom-react-calendar .react-calendar__month-view__weekdays__weekday:last-child { color: var(--primary); } /* 土曜 */
   
+  /* グリッドレイアウトの土台 */
+  .custom-react-calendar .react-calendar__month-view__days {
+    border-top: 1px solid rgba(0,0,0,0.08); /* 上部の一本線 */
+    border-left: 1px solid rgba(0,0,0,0.08); /* 左側の一本線 */
+  }
+
   .custom-react-calendar .react-calendar__month-view__days__day {
-    padding: 0.25rem;
+    padding: 2px; /* 余白を最小化して情報量を増やす */
     background: none;
     border: none;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     color: var(--text-primary);
     cursor: pointer;
-    border-radius: var(--radius-sm); /* 少し角丸を小さくして枠を広く使う */
-    transition: all 0.2s;
+    border-radius: 0; /* 角丸を削除して本格的なグリッドに */
+    transition: background-color 0.2s;
     position: relative;
-    min-height: 70px; /* 高さを確保 */
+    min-height: 80px; /* 少し高さを確保 */
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    border: 1px solid transparent; /* 枠線をうっすらつける準備 */
+    align-items: flex-start; /* 左寄せ */
+    justify-content: flex-start; /* 上寄せ */
+    border-bottom: 1px solid rgba(0,0,0,0.08); /* グリッド横線 */
+    border-right: 1px solid rgba(0,0,0,0.08);  /* グリッド縦線 */
   }
   
-  .custom-react-calendar .react-calendar__month-view__days__day:not(.react-calendar__month-view__days__day--neighboringMonth) {
-    border-bottom: 1px solid rgba(0,0,0,0.03);
-    border-right: 1px solid rgba(0,0,0,0.03);
+  /* 日付の数字部分を操作 (abbr タグで囲まれている想定) */
+  .custom-react-calendar .react-calendar__month-view__days__day abbr {
+    display: block;
+    margin-bottom: 2px;
+    margin-left: 2px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
   }
   
   .custom-react-calendar .react-calendar__tile:enabled:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(0, 0, 0, 0.02);
   }
   
   .custom-react-calendar .react-calendar__tile--now {
+    background-color: rgba(200, 123, 90, 0.05); /* 今日のマスをうっすら色付け */
+  }
+  .custom-react-calendar .react-calendar__tile--now abbr {
     font-weight: 800;
-    color: var(--accent-primary);
+    color: var(--accent-primary) !important;
   }
   
   .custom-react-calendar .react-calendar__tile--active {
-    background-color: var(--accent-primary) !important;
-    color: white !important;
-    box-shadow: 0 4px 12px rgba(200, 123, 90, 0.3);
+    background-color: rgba(200, 123, 90, 0.1) !important; /* 選択中もベタ塗りをやめて透過色に */
+    color: inherit !important;
+    box-shadow: inset 0 0 0 2px var(--accent-primary); /* 内側にボーダーをつけて目立たせる */
   }
   
-  .custom-react-calendar .react-calendar__month-view__days__day--weekend {
-    color: var(--danger);
+  .custom-react-calendar .react-calendar__month-view__days__day--weekend abbr {
+    color: var(--danger); /* 基本の週末を赤に */
   }
   
-  .custom-react-calendar .react-calendar__month-view__days__day--neighboringMonth {
-    color: var(--text-muted);
+  /* 土曜日の判定：weekend クラスが付与されたうち、隣接セルもweekendではない＆自分が週の最後などのreact-calendar仕様を利用するのが難しい場合、
+     react-calendar は デフォルトで formatShortWeekday 等でクラスを振れないので直球の nth-child は曜日構成次第でずれる。
+     しかしReact-calendarは各曜日に固有のクラスを出さないため、nth-childを使うしかない。
+     一番確実なのは、React側の `tileClassName` オプションでクラスを付けることですが、今回はCSSのみでの簡易対応を試みます。
+     週始まりが月曜なら 6n, 日曜なら 7n。現在の設定は日曜始まり(デフォルト)なので 7n は土曜日。 */
+  .custom-react-calendar .react-calendar__month-view__days__day:nth-child(7n) abbr {
+    color: var(--primary); /* 土曜日を青に (上書き) */
+  }
+  /* 前月や来月の日付の色を強制的に薄くする */
+  .custom-react-calendar .react-calendar__month-view__days__day--neighboringMonth abbr {
+    color: var(--text-muted) !important;
+    opacity: 0.5;
   }
   
-  /* Labels for events and items (New Design) */
+  /* --- 家計簿風テキストレイアウト --- */
   .calendar-tile-content-labels {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    margin-top: 2px;
+    gap: 1px;
     width: 100%;
     align-items: stretch;
+    padding: 0 1px;
   }
   
+  /* スマホの小さな画面でも見えるように設定 */
   .calendar-label {
-    font-size: 0.65rem; /* スマホでも入るようにかなり小さめ */
-    padding: 2px 4px;
-    border-radius: 4px;
+    font-size: 0.6rem; /* さらに小さく */
+    padding: 1px 2px;
+    border-radius: 2px; /* 丸みを抑える */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     text-align: left;
-    line-height: 1.1;
-    color: rgba(0,0,0,0.8);
-    font-weight: 500;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    width: 100%; /* コンテナ幅いっぱいに広げる */
+  }
+
+  /* ドットやアイコンの代わりの小さな装飾 */
+  .calendar-label::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    flex-shrink: 0;
   }
   
   .label-event {
-    background-color: var(--warning);
-    border-left: 2px solid darken(var(--warning), 20%);
+    color: var(--text-primary);
+    background-color: transparent; /* 背景なし */
+  }
+  .label-event::before {
+    background-color: var(--warning); /* 色付きの点 */
   }
   
   .label-item {
-    background-color: var(--success);
-    color: white;
+    color: var(--text-primary);
+    background-color: transparent; /* 背景なし */
+  }
+  .label-item::before {
+    background-color: var(--success); /* 色付きの点 */
+  }
+
+  /* アイテムと価格をまとめるラッパー */
+  .calendar-item-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%; /* 横幅いっぱいにして価格を右寄せしやすくする */
+  }
+
+  /* 金額表示用 (アイテムのみ) */
+  .calendar-amount {
+    display: block;
+    font-size: 0.55rem; /* さらにもう一段階小さく */
+    color: var(--text-secondary);
+    text-align: right; /* 右寄せ */
+    width: 100%;
+    margin-top: -1px;
+    padding-right: 2px;
+    font-family: monospace; /* 金額を見やすく */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
   .calendar-label-more {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     color: var(--text-muted);
     text-align: center;
     margin-top: 1px;
-    font-weight: 600;
+    font-weight: 500;
   }
   
   .custom-react-calendar .react-calendar__tile--active .calendar-label {
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2); /* アクティブ時は少し浮かす */
+    /* アクティブ時の影を削除 */
+    box-shadow: none;
   }
   
   /* Details section */
