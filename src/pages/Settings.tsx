@@ -174,14 +174,12 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     return (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
             {/* Header */}
-            <header style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-                <Button variant="ghost" onClick={onBack} size="sm">
-                    <ArrowLeft size={20} />
-                </Button>
-                <h1 className="text-gradient" style={{ fontSize: '2rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
-                    設定
-                </h1>
-            </header>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+                <button onClick={onBack} className="modal-close" style={{ background: 'var(--bg-glass)', padding: '0.5rem' }}>
+                    <ArrowLeft size={24} />
+                </button>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>設定 (Settings) <span style={{fontSize: '0.7rem', color: 'var(--danger)'}}>[DEBUG: v1.1]</span></h1>
+            </div>
 
             <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '2rem' }}>
                 <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>プロフィール設定</h2>
@@ -273,7 +271,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     />
                 </div>
 
-                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: 'var(--radius-md)', border: '1px border var(--glass-border)' }}>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
                     <label className="input-label" style={{ fontWeight: 600 }}>予算設定 (Budget Settings)</label>
                     <div className="input-wrapper">
                         <label className="input-label">対象の月 (Select Month)</label>
