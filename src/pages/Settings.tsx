@@ -273,23 +273,27 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     />
                 </div>
 
-                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                        <label className="input-label" style={{ margin: 0 }}>予算 (Monthly Budget)</label>
+                <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: 'var(--radius-md)', border: '1px border var(--glass-border)' }}>
+                    <label className="input-label" style={{ fontWeight: 600 }}>予算設定 (Budget Settings)</label>
+                    <div className="input-wrapper">
+                        <label className="input-label">対象の月 (Select Month)</label>
                         <input 
                             type="month" 
                             className="input-field" 
                             value={targetMonth} 
                             onChange={e => setTargetMonth(e.target.value)}
-                            style={{ width: 'auto', padding: '0.25rem 0.5rem', fontSize: '0.875rem', colorScheme: 'dark' }}
+                            style={{ colorScheme: 'dark' }}
                         />
                     </div>
-                    <Input
-                        type="number"
-                        placeholder="例: 50000"
-                        value={monthlyBudget}
-                        onChange={e => setMonthlyBudgetVal(e.target.value)}
-                    />
+                    <div className="input-wrapper">
+                        <label className="input-label">月の予算額 (Amount)</label>
+                        <Input
+                            type="number"
+                            placeholder="例: 50000"
+                            value={monthlyBudget}
+                            onChange={e => setMonthlyBudgetVal(e.target.value)}
+                        />
+                    </div>
                 </div>
 
                 {message && (

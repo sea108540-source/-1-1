@@ -1,3 +1,10 @@
+-- 既存のポリシーを削除（再実行時にエラーにならないようにするため）
+DROP POLICY IF EXISTS "Users can view their own monthly budgets" ON public.monthly_budgets;
+DROP POLICY IF EXISTS "Users can insert their own monthly budgets" ON public.monthly_budgets;
+DROP POLICY IF EXISTS "Users can update their own monthly budgets" ON public.monthly_budgets;
+DROP POLICY IF EXISTS "Users can delete their own monthly budgets" ON public.monthly_budgets;
+
+-- テーブル作成
 CREATE TABLE IF NOT EXISTS public.monthly_budgets (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -8,8 +15,10 @@ CREATE TABLE IF NOT EXISTS public.monthly_budgets (
     UNIQUE(user_id, month)
 );
 
+-- RLS（行レベルセキュリティ）を有効化
 ALTER TABLE public.monthly_budgets ENABLE ROW LEVEL SECURITY;
 
+-- ポリシーを再作成
 CREATE POLICY "Users can view their own monthly budgets"
     ON public.monthly_budgets FOR SELECT
     USING (auth.uid() = user_id);

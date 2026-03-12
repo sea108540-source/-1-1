@@ -15,6 +15,7 @@
 
   --accent-primary: #c87b5a;
   /* Terracotta */
+  --primary: var(--accent-primary);
   --accent-hover: #b06a4a;
   --accent-gradient: linear-gradient(135deg, #c87b5a, #dfa974);
 
