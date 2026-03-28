@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { getGroupItems, addItem, updateItem, deleteItem, reserveItem, cancelReservation } from '../../lib/db';
-import type { Item, Group } from '../../lib/types';
-import { useAuth } from '../../contexts/AuthContext';
 import { ItemCard } from '../ItemCard';
 import { ItemForm } from '../ItemForm';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { addItem, cancelReservation, deleteItem, getGroupItems, reserveItem, updateItem } from '../../lib/db';
+import type { Group, Item } from '../../lib/types';
 
 interface GroupWishlistProps {
     group: Group;
@@ -19,43 +19,46 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<Item | null>(null);
 
-    const loadItems = async () => {
+    const loadItems = useCallback(async () => {
         setLoading(true);
         const data = await getGroupItems(group.id);
         setItems(data);
         setLoading(false);
-    };
+    }, [group.id]);
 
     useEffect(() => {
-        loadItems();
-    }, [group.id]);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void loadItems();
+    }, [loadItems]);
 
     const handleSaveItem = async (item: Item) => {
         if (editingItem) {
             await updateItem(item);
         } else {
-            // addItem automatically handles inserting new item to DB
             await addItem(item);
         }
         await loadItems();
     };
 
     const handleDelete = async (id: string) => {
-        if (confirm('本当に削除しますか？')) {
-            await deleteItem(id);
-            setIsFormOpen(false);
-            setEditingItem(null);
-            await loadItems();
-        }
+        if (!confirm('本当に削除しますか？')) return;
+
+        await deleteItem(id);
+        setIsFormOpen(false);
+        setEditingItem(null);
+        await loadItems();
     };
 
     const handleToggleObtained = async (id: string, currentStatus: boolean) => {
-        const item = items.find(i => i.id === id);
-        if (item) {
-            const updatedItem = { ...item, obtained: !currentStatus, obtainedAt: !currentStatus ? Date.now() : undefined };
-            await updateItem(updatedItem);
-            await loadItems();
-        }
+        const item = items.find(entry => entry.id === id);
+        if (!item) return;
+
+        await updateItem({
+            ...item,
+            obtained: !currentStatus,
+            obtainedAt: !currentStatus ? Date.now() : undefined
+        });
+        await loadItems();
     };
 
     const handleReserve = async (id: string) => {
@@ -84,11 +87,22 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
                 <Button variant="ghost" onClick={onBack} style={{ marginRight: '1rem' }}>
                     <ArrowLeft size={20} />
                 </Button>
+
                 <div style={{ flex: 1 }}>
                     <h2 style={{ fontSize: '1.5rem', margin: 0 }}>{group.name}</h2>
-                    <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.875rem' }}>グループの欲しいものリスト</p>
+                    <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.875rem' }}>
+                        グループ用のほしい物リスト
+                    </p>
                 </div>
-                <Button variant="primary" icon={<Plus size={18} />} onClick={() => { setEditingItem(null); setIsFormOpen(true); }}>
+
+                <Button
+                    variant="primary"
+                    icon={<Plus size={18} />}
+                    onClick={() => {
+                        setEditingItem(null);
+                        setIsFormOpen(true);
+                    }}
+                >
                     追加
                 </Button>
             </div>
@@ -105,8 +119,8 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
                             onToggleObtained={handleToggleObtained}
                             onReserve={handleReserve}
                             onCancelReservation={handleCancelReservation}
-                            onClick={(item) => {
-                                setEditingItem(item);
+                            onClick={selectedItem => {
+                                setEditingItem(selectedItem);
                                 setIsFormOpen(true);
                             }}
                         />
@@ -114,8 +128,15 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
                 </div>
             ) : (
                 <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)' }}>
-                    <p style={{ fontSize: '1.125rem' }}>アイテムがありません</p>
-                    <Button variant="ghost" onClick={() => { setEditingItem(null); setIsFormOpen(true); }} style={{ marginTop: '1rem' }}>
+                    <p style={{ fontSize: '1.125rem' }}>アイテムはまだありません</p>
+                    <Button
+                        variant="ghost"
+                        onClick={() => {
+                            setEditingItem(null);
+                            setIsFormOpen(true);
+                        }}
+                        style={{ marginTop: '1rem' }}
+                    >
                         + 最初のアイテムを追加する
                     </Button>
                 </div>
@@ -123,12 +144,15 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
 
             <ItemForm
                 isOpen={isFormOpen}
-                onClose={() => { setIsFormOpen(false); setEditingItem(null); }}
+                onClose={() => {
+                    setIsFormOpen(false);
+                    setEditingItem(null);
+                }}
                 onSave={handleSaveItem}
                 onDelete={handleDelete}
                 initialData={editingItem}
                 groupId={group.id}
-                readOnly={editingItem?.creator?.id !== user?.id}
+                readOnly={Boolean(editingItem && editingItem.creator?.id !== user?.id)}
             />
         </div>
     );

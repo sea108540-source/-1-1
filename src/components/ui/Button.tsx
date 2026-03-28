@@ -1,5 +1,5 @@
 import React from 'react';
-import './ui.css'; // UI専用CSSを作成してインポートします
+import './ui.css';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -17,13 +17,9 @@ export const Button: React.FC<ButtonProps> = ({
     className = '',
     ...props
 }) => {
-    const classes = [
-        'btn',
-        `btn-${variant}`,
-        `btn-${size}`,
-        fullWidth ? 'btn-full' : '',
-        className
-    ].filter(Boolean).join(' ');
+    const classes = ['btn', `btn-${variant}`, `btn-${size}`, fullWidth ? 'btn-full' : '', className]
+        .filter(Boolean)
+        .join(' ');
 
     return (
         <button className={classes} {...props}>

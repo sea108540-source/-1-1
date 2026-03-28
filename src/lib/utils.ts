@@ -1,51 +1,30 @@
-/**
- * Parses a price string (e.g., "¥1,200", "約3万円", "1500") into a numeric value.
- * Handles commas, '万' (10,000 multiplier), and extracts the first continuous number sequence.
- * 
- * @param priceString The string containing the price
- * @returns The parsed numeric value, or 0 if no valid number is found.
- */
-export function parsePriceString(priceString?: string | null): number {
+﻿export function parsePriceString(priceString?: string | null): number {
     if (!priceString) return 0;
 
-    // Remove commas, whitespace, and currency symbols
-    let sanitized = priceString.replace(/[,¥\\\s]/g, '');
-
-    // Check for "万" (man = 10,000) multiplier
+    const sanitized = priceString.replace(/[,\s円¥￥]/g, '');
     const hasMan = sanitized.includes('万');
-
-    // Extract the first sequence of digits (can include a decimal point)
     const match = sanitized.match(/\d+(\.\d+)?/);
     if (!match) return 0;
 
     let value = parseFloat(match[0]);
-
     if (hasMan) {
         value *= 10000;
     }
 
-    return isNaN(value) ? 0 : value;
+    return Number.isNaN(value) ? 0 : value;
 }
 
-/**
- * Formats a price into a string with "円" suffix.
- * Handles both numeric values and string-based prices.
- */
 export function formatPrice(price?: string | number | null): string {
     if (price === undefined || price === null || price === '') return '';
-    
+
     if (typeof price === 'number') {
-        return price.toLocaleString() + '円';
+        return `${price.toLocaleString()}円`;
     }
 
-    // Attempt to parse if it's a string, to normalize it (remove ¥, add 円)
     const num = parsePriceString(price);
     if (num > 0) {
-        return num.toLocaleString() + '円';
+        return `${num.toLocaleString()}円`;
     }
 
-    // If it's a non-numeric string like "未定", just append "円" if it's not already there
-    // but the user said "everything", so let's be careful.
-    return price.includes('円') ? price : price + '円';
+    return /[円¥￥]$/.test(price) ? price : `${price}円`;
 }
-

@@ -1,6 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { getFriends, addFriend, searchUserByUsername, getFriendItems, getProfile, updateProfile } from '../../lib/db';
-import type { Profile, Item } from '../../lib/types';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+    addFriend,
+    deleteItem,
+    getFriendItems,
+    getFriends,
+    getProfile,
+    searchUserByUsername,
+    updateItem,
+    updateProfile,
+} from '../../lib/db';
+import type { FriendRequest, Item, Profile } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { UserPlus, Users, ArrowLeft, Search, User as UserIcon, Cake, Check, X, QrCode, Download } from 'lucide-react';
@@ -8,7 +17,6 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ItemCard } from '../ItemCard';
 import { ItemForm } from '../ItemForm';
-import { updateItem, deleteItem } from '../../lib/db';
 
 interface FriendManagerProps {
     onBack: () => void;
@@ -17,7 +25,7 @@ interface FriendManagerProps {
 export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
     const { user } = useAuth();
     const [friends, setFriends] = useState<Profile[]>([]);
-    const [requests, setRequests] = useState<any[]>([]); // To hold friend requests
+    const [requests, setRequests] = useState<FriendRequest[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [foundUser, setFoundUser] = useState<Profile | null>(null);
     const [selectedFriend, setSelectedFriend] = useState<Profile | null>(null);
@@ -30,62 +38,71 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<Item | null>(null);
 
-    useEffect(() => {
-        loadFriends();
-        loadRequests();
-        if (user) loadMyProfile();
-    }, [user]);
-
-    const loadFriends = async () => {
+    const loadFriends = useCallback(async () => {
         const data = await getFriends();
         setFriends(data);
-    };
+    }, []);
 
-    const loadRequests = async () => {
-        // assuming import { getFriendRequests } from '../../lib/db' was added or will be added
+    const loadRequests = useCallback(async () => {
         const { getFriendRequests } = await import('../../lib/db');
         const reqData = await getFriendRequests();
         setRequests(reqData);
-    };
+    }, []);
+
+    const loadMyProfile = useCallback(async () => {
+        if (!user) return;
+
+        const profile = await getProfile(user.id);
+        setMyProfile(profile);
+        if (profile) {
+            setNewUsername(profile.username || '');
+        }
+    }, [user]);
+
+    useEffect(() => {
+        void loadFriends();
+        void loadRequests();
+        void loadMyProfile();
+    }, [loadFriends, loadMyProfile, loadRequests]);
 
     const handleAcceptRequest = async (id: string) => {
         const { acceptFriendRequest } = await import('../../lib/db');
         await acceptFriendRequest(id);
-        loadRequests();
-        loadFriends();
+        void loadRequests();
+        void loadFriends();
     };
 
     const handleRejectRequest = async (id: string) => {
         const { rejectFriendRequest } = await import('../../lib/db');
         await rejectFriendRequest(id);
-        loadRequests();
-    };
-
-    const loadMyProfile = async () => {
-        if (!user) return;
-        const profile = await getProfile(user.id);
-        setMyProfile(profile);
-        if (profile) setNewUsername(profile.username || '');
+        void loadRequests();
     };
 
     const handleSearch = async () => {
-        if (!searchQuery) return;
+        if (!searchQuery.trim()) return;
+
         setLoading(true);
-        const result = await searchUserByUsername(searchQuery);
-        setFoundUser(result);
-        setLoading(false);
+        try {
+            const result = await searchUserByUsername(searchQuery.trim());
+            setFoundUser(result);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleAddFriend = async () => {
         if (!foundUser) return;
+
         try {
             await addFriend(foundUser.id);
-            alert(`${foundUser.display_name || foundUser.username} に友達リクエストを送信しました！\n相手が承認すると友達リストに追加されます。`);
+            alert(`${foundUser.display_name || foundUser.username} に友達リクエストを送信しました。`);
             setFoundUser(null);
             setSearchQuery('');
-            loadFriends();
-        } catch (err: any) {
-            alert('リクエストの送信に失敗しました:\n' + (err.message || '既に追加されているか、自分自身を追加しようとしている可能性があります。'));
+            void loadFriends();
+            void loadRequests();
+        } catch (err) {
+            const message = err instanceof Error ? err.message : '不明なエラーが発生しました。';
+            alert(`友達リクエストの送信に失敗しました。\n${message}`);
         }
     };
 
@@ -96,28 +113,30 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
     };
 
     const handleUpdateProfile = async () => {
-        if (!user || !newUsername) return;
+        if (!user || !newUsername.trim()) return;
+
         try {
             await updateProfile({
                 id: user.id,
-                username: newUsername,
+                username: newUsername.trim(),
                 display_name: myProfile?.display_name || user.email?.split('@')[0] || 'User',
-                updated_at: new Date().toISOString() as any
+                updated_at: new Date().toISOString()
             });
             setIsSettingId(false);
-            loadMyProfile();
-            alert('IDを設定しました！このIDを友達に教えてください。');
-        } catch (err: any) {
-            console.error('Profile update failed:', err);
-            alert(`エラーが発生しました: ${err.message || '不明なエラー'}\n(このIDは既に使われている可能性があります)`);
+            await loadMyProfile();
+            alert('IDを更新しました。');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : '不明なエラーが発生しました。';
+            alert(`IDの更新に失敗しました。\n${message}`);
         }
     };
 
     const handleDownloadQR = () => {
-        const canvas = document.getElementById('my-qr-code') as HTMLCanvasElement;
+        const canvas = document.getElementById('my-qr-code') as HTMLCanvasElement | null;
         if (!canvas) return;
-        const pngUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-        let downloadLink = document.createElement("a");
+
+        const pngUrl = canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream');
+        const downloadLink = document.createElement('a');
         downloadLink.href = pngUrl;
         downloadLink.download = `qr_${myProfile?.username || 'user'}.png`;
         document.body.appendChild(downloadLink);
@@ -125,19 +144,17 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
         document.body.removeChild(downloadLink);
     };
 
-
     if (selectedFriend) {
         return (
             <div className="friend-wishlist-view">
-                {/* 戻るボタン */}
                 <div style={{ marginBottom: '1.5rem' }}>
-                    <Button variant="ghost" icon={<ArrowLeft size={18} />} onClick={() => setSelectedFriend(null)}>戻る</Button>
+                    <Button variant="ghost" icon={<ArrowLeft size={18} />} onClick={() => setSelectedFriend(null)}>
+                        戻る
+                    </Button>
                 </div>
 
-                {/* Instagramライクなプロフィールカード */}
                 <div className="glass-panel" style={{ padding: '1.5rem 2rem', marginBottom: '2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                        {/* アバター */}
                         <div style={{ flexShrink: 0 }}>
                             {selectedFriend.avatar_url ? (
                                 <img
@@ -152,25 +169,26 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                                     }}
                                 />
                             ) : (
-                                <div style={{
-                                    width: 80,
-                                    height: 80,
-                                    borderRadius: '50%',
-                                    background: 'linear-gradient(135deg, var(--primary), var(--accent-primary, #8b5cf6))',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '2rem',
-                                    fontWeight: 'bold',
-                                    color: 'white',
-                                    border: '2px solid var(--primary)',
-                                }}>
+                                <div
+                                    style={{
+                                        width: 80,
+                                        height: 80,
+                                        borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, var(--primary), var(--accent-primary, #8b5cf6))',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '2rem',
+                                        fontWeight: 'bold',
+                                        color: 'white',
+                                        border: '2px solid var(--primary)',
+                                    }}
+                                >
                                     {(selectedFriend.display_name || selectedFriend.username || '?')[0].toUpperCase()}
                                 </div>
                             )}
                         </div>
 
-                        {/* 名前・ID・自己紹介 */}
                         <div style={{ flex: 1, minWidth: 0 }}>
                             <p style={{ margin: '0 0 0.15rem 0', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {selectedFriend.display_name || selectedFriend.username}
@@ -184,17 +202,18 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                                 </p>
                             )}
                             {selectedFriend.birthday && (() => {
-                                const bd = new Date(selectedFriend.birthday);
+                                const birthdayDate = new Date(selectedFriend.birthday);
                                 const today = new Date();
-                                const month = bd.getMonth() + 1;
-                                const day = bd.getDate();
-                                const isToday = today.getMonth() === bd.getMonth() && today.getDate() === bd.getDate();
+                                const month = birthdayDate.getMonth() + 1;
+                                const day = birthdayDate.getDate();
+                                const isToday = today.getMonth() === birthdayDate.getMonth() && today.getDate() === birthdayDate.getDate();
+
                                 return (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
                                         <Cake size={14} />
                                         <span>
                                             {month}月{day}日
-                                            {isToday && <span style={{ marginLeft: '0.5rem', color: '#f59e0b', fontWeight: 700 }}>🎉 今日が誕生日！</span>}
+                                            {isToday && <span style={{ marginLeft: '0.5rem', color: '#f59e0b', fontWeight: 700 }}>誕生日です</span>}
                                         </span>
                                     </div>
                                 );
@@ -203,20 +222,15 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                     </div>
                 </div>
 
-                {/* アイテムリスト */}
                 {friendItems.length > 0 ? (
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                        gap: '1rem'
-                    }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
                         {friendItems.map(item => (
                             <ItemCard
                                 key={item.id}
                                 item={item}
-                                onToggleObtained={() => { }} // 友達のリストは変更不可
-                                onClick={(item) => {
-                                    setEditingItem(item);
+                                onToggleObtained={() => {}}
+                                onClick={clickedItem => {
+                                    setEditingItem(clickedItem);
                                     setIsFormOpen(true);
                                 }}
                             />
@@ -230,23 +244,26 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
 
                 <ItemForm
                     isOpen={isFormOpen}
-                    onClose={() => { setIsFormOpen(false); setEditingItem(null); }}
-                    onSave={async (item) => {
+                    onClose={() => {
+                        setIsFormOpen(false);
+                        setEditingItem(null);
+                    }}
+                    onSave={async item => {
                         await updateItem(item);
                         if (selectedFriend) {
                             const items = await getFriendItems(selectedFriend.id);
                             setFriendItems(items);
                         }
                     }}
-                    onDelete={async (id) => {
-                        if (confirm('本当に削除しますか？')) {
-                            await deleteItem(id);
-                            setIsFormOpen(false);
-                            setEditingItem(null);
-                            if (selectedFriend) {
-                                const items = await getFriendItems(selectedFriend.id);
-                                setFriendItems(items);
-                            }
+                    onDelete={async id => {
+                        if (!confirm('本当に削除しますか？')) return;
+
+                        await deleteItem(id);
+                        setIsFormOpen(false);
+                        setEditingItem(null);
+                        if (selectedFriend) {
+                            const items = await getFriendItems(selectedFriend.id);
+                            setFriendItems(items);
                         }
                     }}
                     initialData={editingItem}
@@ -259,69 +276,94 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
     return (
         <div className="friend-manager">
             <header style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-                <Button variant="ghost" icon={<ArrowLeft size={18} />} onClick={onBack}>戻る</Button>
-                <h2 style={{ margin: 0 }}>友達を探す・管理</h2>
+                <Button variant="ghost" icon={<ArrowLeft size={18} />} onClick={onBack}>
+                    戻る
+                </Button>
+                <h2 style={{ margin: 0 }}>友達を探す・管理する</h2>
             </header>
 
-            {/* My Profile / ID Setting */}
             <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem' }}>自分のマイID</h3>
+                        <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem' }}>自分の公開ID</h3>
                         {myProfile?.username ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>@{myProfile.username}</span>
-                                <Button variant="secondary" size="sm" icon={<QrCode size={16} />} onClick={() => setShowQRModal(true)}>QRコード</Button>
-                                <Button variant="ghost" size="sm" onClick={() => setIsSettingId(true)}>変更</Button>
+                                <Button variant="secondary" size="sm" icon={<QrCode size={16} />} onClick={() => setShowQRModal(true)}>
+                                    QRコード
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => setIsSettingId(true)}>
+                                    編集
+                                </Button>
                             </div>
                         ) : (
-                            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>IDが設定されていません</p>
+                            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.875rem' }}>IDがまだ設定されていません</p>
                         )}
                     </div>
                     {!myProfile?.username && (
-                        <Button variant="primary" size="sm" onClick={() => setIsSettingId(true)}>IDを設定する</Button>
+                        <Button variant="primary" size="sm" onClick={() => setIsSettingId(true)}>
+                            IDを設定する
+                        </Button>
                     )}
                 </div>
 
                 {isSettingId && (
                     <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
                         <Input
-                            placeholder="英数字でIDを入力..."
+                            placeholder="英数字でIDを入力"
                             value={newUsername}
                             onChange={e => setNewUsername(e.target.value)}
                         />
-                        <Button variant="primary" onClick={handleUpdateProfile}>保存</Button>
-                        <Button variant="ghost" onClick={() => setIsSettingId(false)}>キャンセル</Button>
+                        <Button variant="primary" onClick={handleUpdateProfile}>
+                            保存
+                        </Button>
+                        <Button variant="ghost" onClick={() => setIsSettingId(false)}>
+                            キャンセル
+                        </Button>
                     </div>
                 )}
             </div>
 
-            {/* QR Modal */}
             {showQRModal && myProfile?.username && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    zIndex: 100, padding: '1rem'
-                }} onClick={() => setShowQRModal(false)}>
-                    <div style={{
-                        background: 'var(--bg-card)',
-                        padding: '2rem',
-                        borderRadius: 'var(--radius-lg)',
-                        textAlign: 'center',
-                        maxWidth: '350px',
-                        width: '100%',
-                        border: '1px solid var(--glass-border)',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                    }} onClick={e => e.stopPropagation()}>
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 100,
+                        padding: '1rem'
+                    }}
+                    onClick={() => setShowQRModal(false)}
+                >
+                    <div
+                        style={{
+                            background: 'var(--bg-card)',
+                            padding: '2rem',
+                            borderRadius: 'var(--radius-lg)',
+                            textAlign: 'center',
+                            maxWidth: '350px',
+                            width: '100%',
+                            border: '1px solid var(--glass-border)',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
                         <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem', color: 'var(--text-primary)' }}>あなたのQRコード</h3>
-                        <div style={{
-                            background: 'white',
-                            padding: '1rem',
-                            borderRadius: 'var(--radius-md)',
-                            display: 'inline-block',
-                            marginBottom: '1.5rem'
-                        }}>
+                        <div
+                            style={{
+                                background: 'white',
+                                padding: '1rem',
+                                borderRadius: 'var(--radius-md)',
+                                display: 'inline-block',
+                                marginBottom: '1.5rem'
+                            }}
+                        >
                             <QRCodeCanvas
                                 id="my-qr-code"
                                 value={`${window.location.origin}/p/${myProfile.username}`}
@@ -332,7 +374,7 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                             />
                         </div>
                         <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                            このQRコードを読み取ってもらうと、<br />すぐに友達の申請ができます。
+                            このQRコードを読み取ってもらうと、公開プロフィールを開けます。
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             <Button variant="primary" icon={<Download size={18} />} onClick={handleDownloadQR}>
@@ -346,22 +388,25 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                 </div>
             )}
 
-            {/* Friend Requests */}
             {requests.length > 0 && (
                 <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem', border: '1px solid var(--primary)' }}>
                     <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{
-                            background: 'var(--primary)',
-                            color: 'white',
-                            borderRadius: '50%',
-                            width: '20px',
-                            height: '20px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                        }}>{requests.length}</span>
+                        <span
+                            style={{
+                                background: 'var(--primary)',
+                                color: 'white',
+                                borderRadius: '50%',
+                                width: '20px',
+                                height: '20px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            {requests.length}
+                        </span>
                         届いている友達リクエスト
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -383,8 +428,12 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <Button variant="primary" size="sm" onClick={() => handleAcceptRequest(req.id)} icon={<Check size={16} />}>承認</Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleRejectRequest(req.id)} icon={<X size={16} />} style={{ color: 'var(--text-muted)' }}>削除</Button>
+                                    <Button variant="primary" size="sm" onClick={() => handleAcceptRequest(req.id)} icon={<Check size={16} />}>
+                                        承認
+                                    </Button>
+                                    <Button variant="ghost" size="sm" onClick={() => handleRejectRequest(req.id)} icon={<X size={16} />} style={{ color: 'var(--text-muted)' }}>
+                                        拒否
+                                    </Button>
                                 </div>
                             </div>
                         ))}
@@ -392,17 +441,18 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                 </div>
             )}
 
-            {/* Search Friends */}
             <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
-                <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>友達をIDで検索</h3>
+                <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>IDで友達を検索</h3>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <Input
-                        placeholder="友達のID (例: friend123)"
+                        placeholder="例: friend123"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         icon={<Search size={18} />}
                     />
-                    <Button variant="secondary" onClick={handleSearch} disabled={loading}>検索</Button>
+                    <Button variant="secondary" onClick={handleSearch} disabled={loading}>
+                        検索
+                    </Button>
                 </div>
 
                 {foundUser && (
@@ -416,7 +466,9 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>@{foundUser.username}</div>
                             </div>
                         </div>
-                        <Button variant="primary" size="sm" icon={<UserPlus size={16} />} onClick={handleAddFriend}>リクエスト送信</Button>
+                        <Button variant="primary" size="sm" icon={<UserPlus size={16} />} onClick={handleAddFriend}>
+                            リクエスト送信
+                        </Button>
                     </div>
                 )}
                 {searchQuery && !loading && !foundUser && foundUser !== null && (
@@ -424,7 +476,6 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                 )}
             </div>
 
-            {/* Friend List */}
             <div>
                 <h3 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem' }}>
                     <Users size={20} /> 友達リスト
@@ -450,7 +501,7 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                     </div>
                 ) : (
                     <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        <p>まだ友達がいません。IDを教えてもらって追加しましょう！</p>
+                        <p>まだ友達がいません。ID検索から追加できます。</p>
                     </div>
                 )}
             </div>

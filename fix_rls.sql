@@ -79,3 +79,8 @@ CREATE POLICY "Delete_Items" ON public.items FOR DELETE USING (
   user_id = auth.uid() OR 
   (group_id IS NOT NULL AND group_id IN (SELECT public.get_my_groups()))
 );
+
+DROP POLICY IF EXISTS "Public items are viewable by everyone" ON public.items;
+CREATE POLICY "Public items are viewable by everyone" ON public.items FOR SELECT USING (
+  is_public = true AND group_id IS NULL
+);

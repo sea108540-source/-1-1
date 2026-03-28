@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { ArrowLeft, User as UserIcon, LogOut, Download, Plus, Copy } from 'lucide-react';
+import { ArrowLeft, Copy, Download, LogOut, Plus, User as UserIcon } from 'lucide-react';
 import { exportDataAsJsonFile } from '../lib/shareUtils';
 import { getItems, getMonthlyBudget, setMonthlyBudget } from '../lib/db';
 
@@ -28,13 +27,15 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const publicProfileUrl = username ? `${window.location.origin}/p/${username}` : '';
 
     useEffect(() => {
         const fetchProfile = async () => {
             if (!user) return;
+
             try {
                 const { data, error } = await supabase
                     .from('profiles')
@@ -43,6 +44,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     .single();
 
                 if (error) throw error;
+
                 setDisplayName(data.display_name || '');
                 setUsername(data.username || '');
                 setBio(data.bio || '');
@@ -50,37 +52,47 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 setAvatarUrl(data.avatar_url || '');
             } catch (error) {
                 console.error('Error fetching profile:', error);
+                setMessage({ type: 'error', text: 'プロフィールの読み込みに失敗しました。' });
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchProfile();
+        void fetchProfile();
     }, [user]);
 
-    // Fetch budget when targetMonth changes
     useEffect(() => {
         const fetchBudget = async () => {
             if (!user || !targetMonth) return;
+
             try {
                 const budget = await getMonthlyBudget(targetMonth);
                 setMonthlyBudgetVal(budget > 0 ? budget.toString() : '');
-            } catch (err) {
-                console.error('Error fetching monthly budget:', err);
+            } catch (error) {
+                console.error('Error fetching monthly budget:', error);
             }
         };
-        fetchBudget();
+
+        void fetchBudget();
     }, [user, targetMonth]);
+
+    useEffect(() => {
+        return () => {
+            if (avatarPreview) {
+                URL.revokeObjectURL(avatarPreview);
+            }
+        };
+    }, [avatarPreview]);
 
     const handleSaveProfile = async () => {
         if (!user) return;
+
         setSaving(true);
         setMessage(null);
 
-        // Basic validation for username
         const validUsernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
         if (!validUsernameRegex.test(username)) {
-            setMessage({ type: 'error', text: 'IDは3〜20文字の半角英数字とアンダースコア（_）のみ使用できます。' });
+            setMessage({ type: 'error', text: 'ID は 3〜20 文字の英数字またはアンダースコアで入力してください。' });
             setSaving(false);
             return;
         }
@@ -97,14 +109,10 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     .upload(fileName, avatarFile, { upsert: true });
 
                 if (uploadError) {
-                    console.error('Upload error details:', uploadError);
-                    throw new Error(`画像のアップロードに失敗しました。(${uploadError.message})`);
+                    throw new Error(`画像のアップロードに失敗しました: ${uploadError.message}`);
                 }
 
-                const { data } = supabase.storage
-                    .from('avatars')
-                    .getPublicUrl(fileName);
-
+                const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
                 finalAvatarUrl = data.publicUrl;
             }
 
@@ -121,26 +129,30 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             const { error } = await supabase.from('profiles').upsert(updates);
 
             if (error) {
-                if (error.code === '23505') { // Unique violation
-                    throw new Error('このIDは既に使用されています。別のIDをお試しください。');
+                if (error.code === '23505') {
+                    throw new Error('その ID はすでに使われています。別の ID を設定してください。');
                 }
                 throw error;
             }
 
-            // Save the monthly budget
             if (targetMonth) {
                 const budgetNum = monthlyBudget ? parseInt(monthlyBudget, 10) : 0;
                 await setMonthlyBudget(targetMonth, budgetNum);
             }
 
             setMessage({ type: 'success', text: 'プロフィールを更新しました。' });
+
             if (avatarFile) {
                 setAvatarUrl(finalAvatarUrl);
                 setAvatarFile(null);
+                if (avatarPreview) {
+                    URL.revokeObjectURL(avatarPreview);
+                }
                 setAvatarPreview(null);
             }
-        } catch (error: any) {
-            setMessage({ type: 'error', text: error.message || 'プロフィールの更新に失敗しました。' });
+        } catch (error) {
+            const text = error instanceof Error ? error.message : 'プロフィールの更新に失敗しました。';
+            setMessage({ type: 'error', text });
         } finally {
             setSaving(false);
         }
@@ -150,20 +162,32 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         try {
             const items = await getItems();
             if (items.length === 0) {
-                alert('エクスポートするアイテムがありません。');
+                window.alert('エクスポートできるアイテムがありません。');
                 return;
             }
             exportDataAsJsonFile(items);
         } catch (error) {
             console.error('Export error:', error);
-            alert('データのエクスポートに失敗しました。');
+            window.alert('データのエクスポートに失敗しました。');
+        }
+    };
+
+    const handleCopyPublicProfileUrl = async () => {
+        if (!publicProfileUrl) return;
+
+        try {
+            await navigator.clipboard.writeText(publicProfileUrl);
+            setMessage({ type: 'success', text: '公開プロフィール URL をコピーしました。' });
+        } catch (error) {
+            console.error('Copy error:', error);
+            setMessage({ type: 'error', text: '公開プロフィール URL のコピーに失敗しました。' });
         }
     };
 
     const handleLogout = async () => {
-        if (confirm('ログアウトしますか？')) {
+        if (window.confirm('ログアウトしますか？')) {
             await supabase.auth.signOut();
-            onBack(); // Return to home/auth screen
+            onBack();
         }
     };
 
@@ -173,12 +197,11 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
     return (
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-                <button onClick={onBack} className="modal-close" style={{ background: 'var(--bg-glass)', padding: '0.5rem' }}>
+                <button onClick={onBack} className="modal-close" style={{ background: 'var(--bg-glass)', padding: '0.5rem' }} aria-label="前の画面へ戻る">
                     <ArrowLeft size={24} />
                 </button>
-                <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>設定 (Settings) <span style={{fontSize: '0.7rem', color: 'var(--danger)'}}>[DEBUG: v1.1]</span></h1>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>設定</h1>
             </div>
 
             <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '2rem' }}>
@@ -197,11 +220,23 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                                 <UserIcon size={40} color="var(--text-muted)" />
                             </div>
                         )}
-                        <div style={{
-                            position: 'absolute', right: -4, bottom: -4, background: 'var(--primary)', color: 'white',
-                            width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            border: '2px solid var(--glass-panel)', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                        }}>
+                        <div
+                            style={{
+                                position: 'absolute',
+                                right: -4,
+                                bottom: -4,
+                                background: 'var(--primary)',
+                                color: 'white',
+                                width: 28,
+                                height: 28,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '2px solid var(--glass-panel)',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                            }}
+                        >
                             <Plus size={16} />
                         </div>
                     </div>
@@ -210,28 +245,31 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                         accept="image/*"
                         ref={fileInputRef}
                         style={{ display: 'none' }}
-                        onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                                const file = e.target.files[0];
+                        onChange={event => {
+                            if (event.target.files && event.target.files[0]) {
+                                const file = event.target.files[0];
+                                if (avatarPreview) {
+                                    URL.revokeObjectURL(avatarPreview);
+                                }
                                 setAvatarFile(file);
                                 setAvatarPreview(URL.createObjectURL(file));
                             }
                         }}
                     />
-                    <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', margin: 0 }}>アイコンをタップして画像を選択</p>
+                    <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', margin: 0 }}>アイコンをタップして画像を変更</p>
                 </div>
 
                 <Input
-                    label="表示名 (Display Name)"
-                    placeholder="あなたの名前"
+                    label="表示名"
+                    placeholder="表示名"
                     value={displayName}
-                    onChange={e => setDisplayName(e.target.value)}
+                    onChange={event => setDisplayName(event.target.value)}
                 />
 
                 <div className="input-wrapper">
                     <label className="input-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>ID (Username)</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>友達検索に使われます</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>公開 URL とユーザー検索に使われます</span>
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                         <span style={{ padding: '0 0.5rem', color: 'var(--text-secondary)' }}>@</span>
@@ -240,68 +278,70 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                             className="input-field"
                             placeholder="username"
                             value={username}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
+                            onChange={event => setUsername(event.target.value)}
                             style={{ flex: 1, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, paddingLeft: '0.5rem' }}
                         />
                     </div>
                 </div>
 
                 <div className="input-wrapper">
-                    <label className="input-label">自己紹介 (Bio)</label>
+                    <label className="input-label">自己紹介</label>
                     <textarea
                         className="input-field"
-                        placeholder="自分について書きましょう..."
+                        placeholder="自己紹介を入力"
                         value={bio}
-                        onChange={e => setBio(e.target.value)}
+                        onChange={event => setBio(event.target.value)}
                         style={{ minHeight: '100px', resize: 'vertical', paddingTop: '0.75rem' }}
                     />
                 </div>
 
                 <div className="input-wrapper">
                     <label className="input-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>誕生日 (Birthday)</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>友達に公開されます</span>
+                        <span>誕生日</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>公開プロフィールにも表示されます</span>
                     </label>
                     <input
                         type="date"
                         className="input-field"
                         value={birthday}
-                        onChange={e => setBirthday(e.target.value)}
+                        onChange={event => setBirthday(event.target.value)}
                         style={{ colorScheme: 'dark' }}
                     />
                 </div>
 
                 <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
-                    <label className="input-label" style={{ fontWeight: 600 }}>予算設定 (Budget Settings)</label>
+                    <label className="input-label" style={{ fontWeight: 600 }}>月予算の設定</label>
                     <div className="input-wrapper">
-                        <label className="input-label">対象の月 (Select Month)</label>
-                        <input 
-                            type="month" 
-                            className="input-field" 
-                            value={targetMonth} 
-                            onChange={e => setTargetMonth(e.target.value)}
+                        <label className="input-label">対象の月</label>
+                        <input
+                            type="month"
+                            className="input-field"
+                            value={targetMonth}
+                            onChange={event => setTargetMonth(event.target.value)}
                             style={{ colorScheme: 'dark' }}
                         />
                     </div>
                     <div className="input-wrapper">
-                        <label className="input-label">月の予算額 (Amount)</label>
+                        <label className="input-label">その月の予算</label>
                         <Input
                             type="number"
                             placeholder="例: 50000"
                             value={monthlyBudget}
-                            onChange={e => setMonthlyBudgetVal(e.target.value)}
+                            onChange={event => setMonthlyBudgetVal(event.target.value)}
                         />
                     </div>
                 </div>
 
                 {message && (
-                    <div style={{
-                        padding: '1rem',
-                        borderRadius: 'var(--radius-md)',
-                        background: message.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                        color: message.type === 'success' ? '#10b981' : '#ef4444',
-                        border: `1px solid ${message.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
-                    }}>
+                    <div
+                        style={{
+                            padding: '1rem',
+                            borderRadius: 'var(--radius-md)',
+                            background: message.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            color: message.type === 'success' ? '#10b981' : '#ef4444',
+                            border: `1px solid ${message.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                        }}
+                    >
                         {message.text}
                     </div>
                 )}
@@ -314,18 +354,17 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             </div>
 
             <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-                <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>共有設定</h2>
+                <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>公開設定</h2>
                 <div style={{ padding: '1.5rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
-                    <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: 'var(--text-primary)' }}>SNSでシェアする</h3>
+                    <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: 'var(--text-primary)' }}>公開プロフィール URL</h3>
                     <p style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                        以下のURLを共有すると、あなたの「欲しいものリスト」と「入手済みアイテム」を公開できます。<br />
-                        （未ログインのユーザーでも表示可能です）
+                        SNS やメッセージで共有すると、あなたの公開プロフィールと公開中のアイテムを見てもらえます。
                     </p>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <input
                             type="text"
                             readOnly
-                            value={`${window.location.origin}/p/${username || user?.id?.substring(0, 8)}`}
+                            value={publicProfileUrl || 'ID (Username) を設定すると公開プロフィール URL が表示されます'}
                             className="input-field"
                             style={{
                                 flex: 1,
@@ -334,39 +373,41 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                                 border: '1px solid var(--glass-border)',
                                 fontSize: '0.9rem'
                             }}
-                            onClick={(e) => e.currentTarget.select()}
-                        />
-                        <Button
-                            variant="primary"
-                            onClick={async () => {
-                                const url = `${window.location.origin}/p/${username || user?.id?.substring(0, 8)}`;
-                                await navigator.clipboard.writeText(url);
-                                alert('クリップボードにコピーしました！');
+                            onClick={event => {
+                                if (publicProfileUrl) {
+                                    event.currentTarget.select();
+                                }
                             }}
-                        >
+                        />
+                        <Button variant="primary" disabled={!publicProfileUrl} onClick={handleCopyPublicProfileUrl}>
                             <Copy size={16} /> コピー
                         </Button>
                     </div>
+                    {!username && (
+                        <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            公開 URL を使うには、先に `ID (Username)` を設定してください。
+                        </p>
+                    )}
                 </div>
             </div>
 
             <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>アカウント操作</h2>
+                <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>アカウント管理</h2>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                     <div>
                         <h4 style={{ margin: '0 0 0.25rem 0' }}>データのエクスポート</h4>
-                        <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>登録した全アイテムをバックアップします。</p>
+                        <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>登録した全アイテムをバックアップできます。</p>
                     </div>
                     <Button variant="secondary" icon={<Download size={16} />} onClick={handleExportData}>
-                        保存
+                        エクスポート
                     </Button>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
                     <div>
                         <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--danger)' }}>ログアウト</h4>
-                        <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>アカウントからサインアウトします。</p>
+                        <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>現在のアカウントからサインアウトします。</p>
                     </div>
                     <Button variant="danger" icon={<LogOut size={16} />} onClick={handleLogout}>
                         ログアウト

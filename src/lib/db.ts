@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 import type { DBSchema, IDBPDatabase } from 'idb';
 import { supabase } from './supabase';
-import type { Item, Profile, Group, FriendRequest } from './types';
+import type { Item, Profile, Group, FriendRequest, CalendarEvent } from './types';
 
 const DB_NAME = 'WishlistDB';
 const DB_VERSION = 1;
@@ -20,6 +20,44 @@ interface WishlistSchema extends DBSchema {
 }
 
 let dbPromise: Promise<IDBPDatabase<WishlistSchema>> | null = null;
+
+type DbItemRow = {
+  id: string;
+  title: string;
+  url: string | null;
+  image_type: Item['image'] extends { type: infer T } ? T | null : null;
+  image_value: string | null;
+  memo: string | null;
+  priority: Item['priority'] | null;
+  category: string | null;
+  price: string | null;
+  created_at: number;
+  obtained: boolean;
+  obtained_at: number | null;
+  group_id: string | null;
+  is_public: boolean | null;
+  creator?: Profile;
+  profiles?: Profile;
+  groups?: Group;
+  reserved_by?: string | null;
+  reserver?: Profile;
+  target_date?: string | null;
+};
+
+type GroupIdRow = {
+  group_id: string;
+};
+
+type GroupMemberProfileRow = {
+  profiles: Profile[];
+};
+
+type GroupRow = {
+  id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+};
 
 export const getDB = async () => {
   if (!dbPromise) {
@@ -59,7 +97,7 @@ const mapToDbItem = (item: Item, userId: string) => ({
   target_date: item.target_date || null,
 });
 
-const mapFromDbItem = (row: any): Item => ({
+const mapFromDbItem = (row: DbItemRow): Item => ({
   id: row.id,
   title: row.title,
   url: row.url || undefined,
@@ -363,6 +401,27 @@ export const getFriendItems = async (friendId: string): Promise<Item[]> => {
   return data.map(mapFromDbItem);
 };
 
+export const getPublicProfileItems = async (profileId: string, viewerId?: string): Promise<Item[]> => {
+  let query = supabase
+    .from('items')
+    .select('*, groups(id, name), creator:profiles!items_user_id_fkey(id, display_name, username, avatar_url), reserver:profiles!items_reserved_by_fkey(id, display_name, username, avatar_url)')
+    .eq('user_id', profileId)
+    .order('created_at', { ascending: false });
+
+  if (!viewerId || viewerId !== profileId) {
+    query = query.eq('is_public', true);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('getPublicProfileItems error:', error);
+    return [];
+  }
+
+  return data.map(mapFromDbItem);
+};
+
 // ========================
 // Groups
 // ========================
@@ -412,7 +471,7 @@ export const getGroups = async (): Promise<Group[]> => {
 
   if (!memberRows || memberRows.length === 0) return [];
 
-  const groupIds = memberRows.map((r: any) => r.group_id);
+  const groupIds = (memberRows as GroupIdRow[]).map(r => r.group_id);
 
   const { data, error } = await supabase
     .from('groups')
@@ -425,7 +484,7 @@ export const getGroups = async (): Promise<Group[]> => {
     return [];
   }
 
-  return data.map((g: any) => ({
+  return (data as GroupRow[]).map(g => ({
     id: g.id,
     name: g.name,
     created_by: g.created_by,
@@ -447,7 +506,7 @@ export const getGroupMembers = async (groupId: string): Promise<Profile[]> => {
     return [];
   }
 
-  return data.map((d: any) => d.profiles);
+  return (data as GroupMemberProfileRow[]).flatMap(d => d.profiles);
 };
 
 export const addGroupMember = async (groupId: string, userId: string) => {
@@ -499,7 +558,7 @@ export const getGroupItems = async (groupId: string): Promise<Item[]> => {
 // Calendar Events
 // ========================
 
-export const getCalendarEvents = async (): Promise<any[]> => {
+export const getCalendarEvents = async (): Promise<CalendarEvent[]> => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) return [];
 
@@ -512,10 +571,10 @@ export const getCalendarEvents = async (): Promise<any[]> => {
     console.error('Error fetching calendar events:', error);
     return [];
   }
-  return data || [];
+  return (data || []) as CalendarEvent[];
 };
 
-export const addCalendarEvent = async (eventData: Omit<any, 'id' | 'created_at' | 'creator_id'>) => {
+export const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'created_at' | 'creator_id' | 'creator' | 'group'>) => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) throw new Error("Not logged in");
 
@@ -529,7 +588,10 @@ export const addCalendarEvent = async (eventData: Omit<any, 'id' | 'created_at' 
   if (error) throw error;
 };
 
-export const updateCalendarEvent = async (id: string, eventData: Partial<any>) => {
+export const updateCalendarEvent = async (
+  id: string,
+  eventData: Partial<Omit<CalendarEvent, 'id' | 'created_at' | 'creator_id' | 'creator' | 'group'>>
+) => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) throw new Error("Not logged in");
 
