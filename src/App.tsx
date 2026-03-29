@@ -1,5 +1,8 @@
 ﻿import React, { Suspense, lazy } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
+import { FeedbackProvider } from './contexts/FeedbackContext';
+import { getPublicProfileUsername, isPublicProfilePath } from './lib/routes';
+import { useEffect, useState } from 'react';
 
 const Home = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
 const PublicProfile = lazy(() => import('./pages/PublicProfile').then(module => ({ default: module.PublicProfile })));
@@ -11,17 +14,28 @@ const AppFallback: React.FC = () => (
 );
 
 function App() {
-    const path = window.location.pathname;
-    const isPublicProfileRoute = path.startsWith('/p/');
-    const username = isPublicProfileRoute ? path.split('/')[2] : undefined;
+    const [pathname, setPathname] = useState(() => window.location.pathname);
+
+    useEffect(() => {
+        const handlePopState = () => {
+            setPathname(window.location.pathname);
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
+    const username = isPublicProfilePath(pathname) ? getPublicProfileUsername(pathname) : undefined;
 
     return (
         <AuthProvider>
-            <div className="App">
-                <Suspense fallback={<AppFallback />}>
-                    {username ? <PublicProfile username={username} /> : <Home />}
-                </Suspense>
-            </div>
+            <FeedbackProvider>
+                <div className="App">
+                    <Suspense fallback={<AppFallback />}>
+                        {username ? <PublicProfile username={username} /> : <Home routePath={pathname} />}
+                    </Suspense>
+                </div>
+            </FeedbackProvider>
         </AuthProvider>
     );
 }

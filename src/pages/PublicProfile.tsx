@@ -3,6 +3,7 @@ import { ArrowLeft, Cake, Check, LogIn, UserPlus } from 'lucide-react';
 import { addFriend, cancelReservation, getFriends, getPublicProfileItems, reserveItem, searchUserByUsername } from '../lib/db';
 import type { Item, Profile } from '../lib/types';
 import { useAuth } from '../contexts/AuthContext';
+import { useFeedback } from '../contexts/FeedbackContext';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
 import { ItemCard } from '../components/ItemCard';
@@ -13,6 +14,7 @@ interface PublicProfileProps {
 }
 
 export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
+    const { showToast } = useFeedback();
     const [profile, setProfile] = useState<Profile | null>(null);
     const [items, setItems] = useState<Item[]>([]);
     const [loading, setLoading] = useState(true);
@@ -93,7 +95,7 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
             }
         } catch (error) {
             console.error(error);
-            window.alert('予約に失敗しました。');
+            showToast({ type: 'error', message: '予約に失敗しました。' });
         }
     };
 
@@ -105,7 +107,7 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
             }
         } catch (error) {
             console.error(error);
-            window.alert('予約解除に失敗しました。');
+            showToast({ type: 'error', message: '予約解除に失敗しました。' });
         }
     };
 
@@ -116,10 +118,10 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
         try {
             await addFriend(profile.id);
             setFriendStatus('pending');
-            window.alert('フレンドリクエストを送信しました。');
+            showToast({ type: 'success', message: 'フレンドリクエストを送信しました。' });
         } catch (error) {
             const message = error instanceof Error ? error.message : '予期しないエラーが発生しました。';
-            window.alert(`フレンドリクエストの送信に失敗しました。\n${message}`);
+            showToast({ type: 'error', message: `フレンドリクエストの送信に失敗しました。 ${message}` });
         } finally {
             setRequesting(false);
         }

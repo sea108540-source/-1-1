@@ -15,6 +15,7 @@ import { Input } from '../ui/Input';
 import { UserPlus, Users, ArrowLeft, Search, User as UserIcon, Cake, Check, X, QrCode, Download } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFeedback } from '../../contexts/FeedbackContext';
 import { ItemCard } from '../ItemCard';
 import { ItemForm } from '../ItemForm';
 
@@ -24,6 +25,7 @@ interface FriendManagerProps {
 
 export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
     const { user } = useAuth();
+    const { confirm, showToast } = useFeedback();
     const [friends, setFriends] = useState<Profile[]>([]);
     const [requests, setRequests] = useState<FriendRequest[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -95,14 +97,14 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
 
         try {
             await addFriend(foundUser.id);
-            alert(`${foundUser.display_name || foundUser.username} に友達リクエストを送信しました。`);
+            showToast({ type: 'success', message: `${foundUser.display_name || foundUser.username} に友達リクエストを送信しました。` });
             setFoundUser(null);
             setSearchQuery('');
             void loadFriends();
             void loadRequests();
         } catch (err) {
             const message = err instanceof Error ? err.message : '不明なエラーが発生しました。';
-            alert(`友達リクエストの送信に失敗しました。\n${message}`);
+            showToast({ type: 'error', message: `友達リクエストの送信に失敗しました。 ${message}` });
         }
     };
 
@@ -124,10 +126,10 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
             });
             setIsSettingId(false);
             await loadMyProfile();
-            alert('IDを更新しました。');
+            showToast({ type: 'success', message: 'IDを更新しました。' });
         } catch (err) {
             const message = err instanceof Error ? err.message : '不明なエラーが発生しました。';
-            alert(`IDの更新に失敗しました。\n${message}`);
+            showToast({ type: 'error', message: `IDの更新に失敗しました。 ${message}` });
         }
     };
 
@@ -256,7 +258,13 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                         }
                     }}
                     onDelete={async id => {
-                        if (!confirm('本当に削除しますか？')) return;
+                        const shouldDelete = await confirm({
+                            title: 'アイテムを削除',
+                            message: '本当に削除しますか？',
+                            confirmLabel: '削除する',
+                            variant: 'danger',
+                        });
+                        if (!shouldDelete) return;
 
                         await deleteItem(id);
                         setIsFormOpen(false);
@@ -265,6 +273,7 @@ export const FriendManager: React.FC<FriendManagerProps> = ({ onBack }) => {
                             const items = await getFriendItems(selectedFriend.id);
                             setFriendItems(items);
                         }
+                        showToast({ type: 'success', message: 'アイテムを削除しました。' });
                     }}
                     initialData={editingItem}
                     readOnly={editingItem?.creator?.id !== user?.id}

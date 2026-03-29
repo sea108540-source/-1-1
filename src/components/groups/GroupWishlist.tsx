@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { ItemCard } from '../ItemCard';
 import { ItemForm } from '../ItemForm';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFeedback } from '../../contexts/FeedbackContext';
 import { addItem, cancelReservation, deleteItem, getGroupItems, reserveItem, updateItem } from '../../lib/db';
 import type { Group, Item } from '../../lib/types';
 
@@ -14,6 +15,7 @@ interface GroupWishlistProps {
 
 export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) => {
     const { user } = useAuth();
+    const { confirm, showToast } = useFeedback();
     const [items, setItems] = useState<Item[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -41,12 +43,19 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('本当に削除しますか？')) return;
+        const shouldDelete = await confirm({
+            title: 'アイテムを削除',
+            message: '本当に削除しますか？',
+            confirmLabel: '削除する',
+            variant: 'danger',
+        });
+        if (!shouldDelete) return;
 
         await deleteItem(id);
         setIsFormOpen(false);
         setEditingItem(null);
         await loadItems();
+        showToast({ type: 'success', message: 'アイテムを削除しました。' });
     };
 
     const handleToggleObtained = async (id: string, currentStatus: boolean) => {
@@ -67,7 +76,7 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
             await loadItems();
         } catch (err) {
             console.error(err);
-            alert('予約に失敗しました。');
+            showToast({ type: 'error', message: '予約に失敗しました。' });
         }
     };
 
@@ -77,7 +86,7 @@ export const GroupWishlist: React.FC<GroupWishlistProps> = ({ group, onBack }) =
             await loadItems();
         } catch (err) {
             console.error(err);
-            alert('予約のキャンセルに失敗しました。');
+            showToast({ type: 'error', message: '予約のキャンセルに失敗しました。' });
         }
     };
 

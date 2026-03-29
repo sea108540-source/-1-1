@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useFeedback } from '../contexts/FeedbackContext';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -13,6 +14,7 @@ interface SettingsProps {
 
 export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const { user } = useAuth();
+    const { confirm, showToast } = useFeedback();
     const [displayName, setDisplayName] = useState('');
     const [username, setUsername] = useState('');
     const [bio, setBio] = useState('');
@@ -26,15 +28,21 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [profileSaving, setProfileSaving] = useState(false);
+    const [budgetSaving, setBudgetSaving] = useState(false);
+    const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [budgetMessage, setBudgetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [publicMessage, setPublicMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const publicProfileUrl = username ? `${window.location.origin}/p/${username}` : '';
 
     useEffect(() => {
         const fetchProfile = async () => {
-            if (!user) return;
+            if (!user) {
+                setLoading(false);
+                return;
+            }
 
             try {
                 const { data, error } = await supabase
@@ -52,7 +60,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 setAvatarUrl(data.avatar_url || '');
             } catch (error) {
                 console.error('Error fetching profile:', error);
-                setMessage({ type: 'error', text: 'プロフィールの読み込みに失敗しました。' });
+                setProfileMessage({ type: 'error', text: 'プロフィールの読み込みに失敗しました。' });
             } finally {
                 setLoading(false);
             }
@@ -87,13 +95,14 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const handleSaveProfile = async () => {
         if (!user) return;
 
-        setSaving(true);
-        setMessage(null);
+        setProfileSaving(true);
+        setProfileMessage(null);
+        setPublicMessage(null);
 
         const validUsernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
         if (!validUsernameRegex.test(username)) {
-            setMessage({ type: 'error', text: 'ID は 3〜20 文字の英数字またはアンダースコアで入力してください。' });
-            setSaving(false);
+            setProfileMessage({ type: 'error', text: 'ID は 3〜20 文字の英数字またはアンダースコアで入力してください。' });
+            setProfileSaving(false);
             return;
         }
 
@@ -135,12 +144,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 throw error;
             }
 
-            if (targetMonth) {
-                const budgetNum = monthlyBudget ? parseInt(monthlyBudget, 10) : 0;
-                await setMonthlyBudget(targetMonth, budgetNum);
-            }
-
-            setMessage({ type: 'success', text: 'プロフィールを更新しました。' });
+            setProfileMessage({ type: 'success', text: 'プロフィールを更新しました。' });
 
             if (avatarFile) {
                 setAvatarUrl(finalAvatarUrl);
@@ -152,9 +156,33 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
             }
         } catch (error) {
             const text = error instanceof Error ? error.message : 'プロフィールの更新に失敗しました。';
-            setMessage({ type: 'error', text });
+            setProfileMessage({ type: 'error', text });
         } finally {
-            setSaving(false);
+            setProfileSaving(false);
+        }
+    };
+
+    const handleSaveBudget = async () => {
+        if (!user || !targetMonth) return;
+
+        setBudgetSaving(true);
+        setBudgetMessage(null);
+
+        const budgetNum = monthlyBudget.trim() ? Number.parseInt(monthlyBudget, 10) : 0;
+        if (Number.isNaN(budgetNum) || budgetNum < 0) {
+            setBudgetMessage({ type: 'error', text: '予算は 0 以上の整数で入力してください。' });
+            setBudgetSaving(false);
+            return;
+        }
+
+        try {
+            await setMonthlyBudget(targetMonth, budgetNum);
+            setBudgetMessage({ type: 'success', text: `${targetMonth} の予算を保存しました。` });
+        } catch (error) {
+            const text = error instanceof Error ? error.message : '予算の保存に失敗しました。';
+            setBudgetMessage({ type: 'error', text });
+        } finally {
+            setBudgetSaving(false);
         }
     };
 
@@ -162,13 +190,13 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         try {
             const items = await getItems();
             if (items.length === 0) {
-                window.alert('エクスポートできるアイテムがありません。');
+                showToast({ type: 'info', message: 'エクスポートできるアイテムがありません。' });
                 return;
             }
             exportDataAsJsonFile(items);
         } catch (error) {
             console.error('Export error:', error);
-            window.alert('データのエクスポートに失敗しました。');
+            showToast({ type: 'error', message: 'データのエクスポートに失敗しました。' });
         }
     };
 
@@ -177,22 +205,43 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
         try {
             await navigator.clipboard.writeText(publicProfileUrl);
-            setMessage({ type: 'success', text: '公開プロフィール URL をコピーしました。' });
+            setPublicMessage({ type: 'success', text: '公開プロフィール URL をコピーしました。' });
         } catch (error) {
             console.error('Copy error:', error);
-            setMessage({ type: 'error', text: '公開プロフィール URL のコピーに失敗しました。' });
+            setPublicMessage({ type: 'error', text: '公開プロフィール URL のコピーに失敗しました。' });
         }
     };
 
     const handleLogout = async () => {
-        if (window.confirm('ログアウトしますか？')) {
-            await supabase.auth.signOut();
-            onBack();
-        }
+        const shouldLogout = await confirm({
+            title: 'ログアウト',
+            message: 'ログアウトしますか？',
+            confirmLabel: 'ログアウト',
+        });
+        if (!shouldLogout) return;
+
+        await supabase.auth.signOut();
+        onBack();
     };
 
     if (loading) {
         return <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>読み込み中...</div>;
+    }
+
+    if (!user) {
+        return (
+            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+                    <button onClick={onBack} className="modal-close" style={{ background: 'var(--bg-glass)', padding: '0.5rem' }} aria-label="前の画面へ戻る">
+                        <ArrowLeft size={24} />
+                    </button>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>設定</h1>
+                </div>
+                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    ログインすると設定を編集できます。
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -309,6 +358,29 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                     />
                 </div>
 
+                {profileMessage && (
+                    <div
+                        style={{
+                            padding: '1rem',
+                            borderRadius: 'var(--radius-md)',
+                            background: profileMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            color: profileMessage.type === 'success' ? '#10b981' : '#ef4444',
+                            border: `1px solid ${profileMessage.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                        }}
+                    >
+                        {profileMessage.text}
+                    </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                    <Button variant="primary" onClick={handleSaveProfile} disabled={profileSaving}>
+                        {profileSaving ? '保存中...' : 'プロフィールを保存'}
+                    </Button>
+                </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>予算設定</h2>
                 <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
                     <label className="input-label" style={{ fontWeight: 600 }}>月予算の設定</label>
                     <div className="input-wrapper">
@@ -330,25 +402,28 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                             onChange={event => setMonthlyBudgetVal(event.target.value)}
                         />
                     </div>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        ホームでは、必要日がこの月に設定された未購入アイテムと比較します。
+                    </p>
                 </div>
 
-                {message && (
+                {budgetMessage && (
                     <div
                         style={{
                             padding: '1rem',
                             borderRadius: 'var(--radius-md)',
-                            background: message.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                            color: message.type === 'success' ? '#10b981' : '#ef4444',
-                            border: `1px solid ${message.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                            background: budgetMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            color: budgetMessage.type === 'success' ? '#10b981' : '#ef4444',
+                            border: `1px solid ${budgetMessage.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
                         }}
                     >
-                        {message.text}
+                        {budgetMessage.text}
                     </div>
                 )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                    <Button variant="primary" onClick={handleSaveProfile} disabled={saving}>
-                        {saving ? '保存中...' : 'プロフィールを保存'}
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button variant="primary" onClick={handleSaveBudget} disabled={budgetSaving}>
+                        {budgetSaving ? '保存中...' : '予算を保存'}
                     </Button>
                 </div>
             </div>
@@ -387,6 +462,20 @@ export const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                         <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                             公開 URL を使うには、先に `ID (Username)` を設定してください。
                         </p>
+                    )}
+                    {publicMessage && (
+                        <div
+                            style={{
+                                marginTop: '1rem',
+                                padding: '0.875rem 1rem',
+                                borderRadius: 'var(--radius-md)',
+                                background: publicMessage.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                color: publicMessage.type === 'success' ? '#10b981' : '#ef4444',
+                                border: `1px solid ${publicMessage.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                            }}
+                        >
+                            {publicMessage.text}
+                        </div>
                     )}
                 </div>
             </div>

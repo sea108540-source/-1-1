@@ -4,6 +4,7 @@ import { Input } from '../ui/Input';
 import { getGroups, createGroup, getFriends, addGroupMember, getGroupMembers, searchUserByUsername } from '../../lib/db';
 import type { Group, Profile } from '../../lib/types';
 import { Users, Plus, ArrowLeft, UserPlus } from 'lucide-react';
+import { useFeedback } from '../../contexts/FeedbackContext';
 import { GroupWishlist } from './GroupWishlist';
 
 interface GroupManagerProps {
@@ -11,6 +12,7 @@ interface GroupManagerProps {
 }
 
 export const GroupManager: React.FC<GroupManagerProps> = ({ onBack }) => {
+    const { showToast } = useFeedback();
     const [groups, setGroups] = useState<Group[]>([]);
     const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
     const [loading, setLoading] = useState(true);
@@ -44,7 +46,7 @@ export const GroupManager: React.FC<GroupManagerProps> = ({ onBack }) => {
             await loadGroups();
         } catch (err) {
             const message = err instanceof Error ? err.message : '不明なエラーが発生しました。';
-            alert(`グループ作成に失敗しました: ${message}`);
+            showToast({ type: 'error', message: `グループ作成に失敗しました: ${message}` });
         }
     };
 
@@ -67,10 +69,10 @@ export const GroupManager: React.FC<GroupManagerProps> = ({ onBack }) => {
             setGroupMembers(members);
             setSearchQuery('');
             setSearchResult(null);
-            alert('メンバーを追加しました。');
+            showToast({ type: 'success', message: 'メンバーを追加しました。' });
         } catch (err) {
             const message = err instanceof Error ? err.message : '不明なエラーが発生しました。';
-            alert(`追加に失敗しました: ${message}`);
+            showToast({ type: 'error', message: `追加に失敗しました: ${message}` });
         }
     };
 
@@ -83,7 +85,7 @@ export const GroupManager: React.FC<GroupManagerProps> = ({ onBack }) => {
             const result = await searchUserByUsername(searchQuery.trim());
             setSearchResult(result);
             if (!result) {
-                alert('入力されたIDのユーザーが見つかりませんでした。');
+                showToast({ type: 'info', message: '入力されたIDのユーザーが見つかりませんでした。' });
             }
         } catch (err) {
             console.error('Search error:', err);

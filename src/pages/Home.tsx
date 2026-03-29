@@ -2,6 +2,7 @@
 import { Check, Search, Share2, Upload } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../contexts/AuthContext';
+import { useFeedback } from '../contexts/FeedbackContext';
 import { AuthModal } from '../components/AuthModal';
 import { ItemCard } from '../components/ItemCard';
 import { ItemForm } from '../components/ItemForm';
@@ -11,11 +12,12 @@ import { FloatingActionButton } from '../components/layout/FloatingActionButton'
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { addCalendarEvent, addItem, addMultipleItems, deleteItem, getItems, getMonthlyBudget, getMonthlyBudgets, updateItem } from '../lib/db';
+import { getPathForView, getViewFromPath } from '../lib/routes';
 import { generateShareLink, importDataFromJsonFile, parseSharedItemsFromUrl } from '../lib/shareUtils';
 import { formatPrice, parsePriceString } from '../lib/utils';
 import type { Item } from '../lib/types';
+import type { AppView } from '../lib/routes';
 
-type View = 'my-wishlist' | 'calendar' | 'friends' | 'groups' | 'settings';
 type SortOrder = 'newest' | 'oldest' | 'priority';
 type ObtainedFilter = 'all' | 'not_obtained' | 'obtained';
 
@@ -42,8 +44,13 @@ const SectionLoader: React.FC<{ label?: string }> = ({ label = '読み込み中.
     </div>
 );
 
-export const Home: React.FC = () => {
+interface HomeProps {
+    routePath: string;
+}
+
+export const Home: React.FC<HomeProps> = ({ routePath }) => {
     const { user } = useAuth();
+    const { confirm, showToast } = useFeedback();
     const [items, setItems] = useState<Item[]>([]);
     const [monthlyBudget, setMonthlyBudget] = useState(0);
     const [monthlyBudgetsMap, setMonthlyBudgetsMap] = useState<Record<string, number>>({});
@@ -52,19 +59,46 @@ export const Home: React.FC = () => {
     const [selectedEventDate, setSelectedEventDate] = useState<Date | undefined>(undefined);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<Item | null>(null);
-    const [currentView, setCurrentView] = useState<View>('my-wishlist');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [filterObtained, setFilterObtained] = useState<ObtainedFilter>('not_obtained');
     const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
     const [copySuccess, setCopySuccess] = useState(false);
+    const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
+    const [currentMonthKey] = useState(() => getMonthKeyFromTimestamp(Date.now()));
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const requestedView = getViewFromPath(routePath);
+    const currentView: AppView = !user && requestedView !== 'my-wishlist' ? 'my-wishlist' : requestedView;
+
+    const navigateToView = useCallback((view: AppView, options?: { replace?: boolean }) => {
+        const nextPath = getPathForView(view);
+        if (window.location.pathname === nextPath) {
+            return;
+        }
+
+        if (options?.replace) {
+            window.history.replaceState(null, '', nextPath);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+            return;
+        }
+
+        window.history.pushState(null, '', nextPath);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+    }, []);
 
     const loadItems = useCallback(async () => {
         const data = await getItems();
         setItems(data);
     }, []);
+
+    useEffect(() => {
+        if (user || requestedView === 'my-wishlist') {
+            return;
+        }
+
+        navigateToView('my-wishlist', { replace: true });
+    }, [navigateToView, requestedView, user]);
 
     useEffect(() => {
         let cancelled = false;
@@ -85,8 +119,7 @@ export const Home: React.FC = () => {
                     return;
                 }
 
-                const currentMonth = getMonthKeyFromTimestamp(Date.now());
-                const budget = await getMonthlyBudget(currentMonth);
+                const budget = await getMonthlyBudget(currentMonthKey);
                 if (!cancelled) {
                     setMonthlyBudget(budget > 0 ? budget : 0);
                 }
@@ -98,31 +131,48 @@ export const Home: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [currentView, user]);
+    }, [currentMonthKey, currentView, user]);
 
     useEffect(() => {
-        const sharedData = parseSharedItemsFromUrl();
-        if (!sharedData || sharedData.length === 0) return;
+        let cancelled = false;
 
-        const shouldImport = window.confirm(`${sharedData.length} 件のアイテムを共有リンクから取り込みますか？`);
-        if (!shouldImport) {
+        const importSharedItems = async () => {
+            const sharedData = parseSharedItemsFromUrl();
+            if (!sharedData || sharedData.length === 0) return;
+
+            const shouldImport = await confirm({
+                title: '共有アイテムを取り込む',
+                message: `${sharedData.length} 件のアイテムを共有リンクから取り込みますか？`,
+                confirmLabel: '取り込む',
+            });
+            if (!shouldImport || cancelled) {
+                window.location.hash = '';
+                return;
+            }
+
+            const importedItems = sharedData.map((item: Partial<Item>) => ({
+                ...item,
+                id: uuidv4(),
+                createdAt: Date.now(),
+                obtained: false
+            } as Item));
+
+            await addMultipleItems(importedItems);
+            if (cancelled) {
+                return;
+            }
+
             window.location.hash = '';
-            return;
-        }
+            await loadItems();
+            showToast({ type: 'success', message: '共有アイテムを取り込みました。' });
+        };
 
-        const importedItems = sharedData.map((item: Partial<Item>) => ({
-            ...item,
-            id: uuidv4(),
-            createdAt: Date.now(),
-            obtained: false
-        } as Item));
+        void importSharedItems();
 
-        addMultipleItems(importedItems).then(() => {
-            window.location.hash = '';
-            void loadItems();
-            window.alert('共有アイテムを取り込みました。');
-        });
-    }, [loadItems]);
+        return () => {
+            cancelled = true;
+        };
+    }, [confirm, loadItems, showToast]);
 
     useEffect(() => {
         let cancelled = false;
@@ -193,22 +243,29 @@ export const Home: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (!window.confirm('このアイテムを削除しますか？')) return;
+        const shouldDelete = await confirm({
+            title: 'アイテムを削除',
+            message: 'このアイテムを削除しますか？',
+            confirmLabel: '削除する',
+            variant: 'danger',
+        });
+        if (!shouldDelete) return;
 
         await deleteItem(id);
         setIsFormOpen(false);
         setEditingItem(null);
         await loadItems();
+        showToast({ type: 'success', message: 'アイテムを削除しました。' });
     };
 
     const handleShareLink = async () => {
         if (items.length === 0) {
-            window.alert('共有できるアイテムがありません。');
+            showToast({ type: 'info', message: '共有できるアイテムがありません。' });
             return;
         }
 
         if (publicShareableCount === 0) {
-            window.alert('共有できる公開アイテムがありません。アイテム編集で公開設定をオンにしてください。');
+            showToast({ type: 'info', message: '共有できる公開アイテムがありません。アイテム編集で公開設定をオンにしてください。' });
             return;
         }
 
@@ -220,7 +277,7 @@ export const Home: React.FC = () => {
             window.setTimeout(() => setCopySuccess(false), 2000);
         } catch (error) {
             console.error('Failed to copy share link', error);
-            window.alert('共有リンクのコピーに失敗しました。');
+            showToast({ type: 'error', message: '共有リンクのコピーに失敗しました。' });
         }
     };
 
@@ -230,15 +287,19 @@ export const Home: React.FC = () => {
 
         try {
             const imported = await importDataFromJsonFile(file);
-            const shouldImport = window.confirm(`${imported.length} 件のアイテムをインポートしますか？`);
+            const shouldImport = await confirm({
+                title: 'JSON を取り込む',
+                message: `${imported.length} 件のアイテムをインポートしますか？`,
+                confirmLabel: 'インポートする',
+            });
             if (shouldImport) {
                 await addMultipleItems(imported);
                 await loadItems();
-                window.alert('インポートが完了しました。');
+                showToast({ type: 'success', message: 'インポートが完了しました。' });
             }
         } catch (error) {
             console.error('Import error:', error);
-            window.alert('ファイルの読み込みに失敗しました。JSON ファイルを確認してください。');
+            showToast({ type: 'error', message: 'ファイルの読み込みに失敗しました。JSON ファイルを確認してください。' });
         }
 
         if (fileInputRef.current) {
@@ -294,6 +355,14 @@ export const Home: React.FC = () => {
         () => items.filter(item => !item.obtained).reduce((sum, item) => sum + parsePriceString(item.price), 0),
         [items]
     );
+    const currentMonthPlannedItems = useMemo(
+        () => items.filter(item => !item.obtained && item.target_date?.startsWith(currentMonthKey)),
+        [currentMonthKey, items]
+    );
+    const currentMonthPlannedAmount = useMemo(
+        () => currentMonthPlannedItems.reduce((sum, item) => sum + parsePriceString(item.price), 0),
+        [currentMonthPlannedItems]
+    );
 
     const pendingCount = useMemo(() => items.filter(item => !item.obtained).length, [items]);
     const obtainedCount = useMemo(() => items.filter(item => item.obtained).length, [items]);
@@ -317,6 +386,7 @@ export const Home: React.FC = () => {
                 <Suspense fallback={<SectionLoader label="カレンダーを読み込んでいます..." />}>
                     <>
                         <CalendarView
+                            key={calendarRefreshKey}
                             onOpenEventForm={date => {
                                 setSelectedEventDate(date);
                                 setIsEventFormOpen(true);
@@ -354,17 +424,17 @@ export const Home: React.FC = () => {
             )}
             {currentView === 'friends' && (
                 <Suspense fallback={<SectionLoader label="フレンド情報を読み込んでいます..." />}>
-                    <FriendManager onBack={() => setCurrentView('my-wishlist')} />
+                    <FriendManager onBack={() => navigateToView('my-wishlist')} />
                 </Suspense>
             )}
             {currentView === 'groups' && (
                 <Suspense fallback={<SectionLoader label="グループ情報を読み込んでいます..." />}>
-                    <GroupManager onBack={() => setCurrentView('my-wishlist')} />
+                    <GroupManager onBack={() => navigateToView('my-wishlist')} />
                 </Suspense>
             )}
             {currentView === 'settings' && (
                 <Suspense fallback={<SectionLoader label="設定を読み込んでいます..." />}>
-                    <Settings onBack={() => setCurrentView('my-wishlist')} />
+                    <Settings onBack={() => navigateToView('my-wishlist')} />
                 </Suspense>
             )}
 
@@ -521,10 +591,13 @@ export const Home: React.FC = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.5rem' }}>
                                 <div>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', display: 'block', marginBottom: '0.25rem' }}>
-                                        リストの合計金額
+                                        今月予定の合計金額
                                     </span>
                                     <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.02em', lineHeight: 1 }}>
-                                        {formatPrice(totalWishlistAmount)}
+                                        {formatPrice(currentMonthPlannedAmount)}
+                                    </span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                        必要日が {formatMonthLabel(currentMonthKey)} の未購入アイテム {currentMonthPlannedItems.length}件
                                     </span>
                                 </div>
 
@@ -538,7 +611,7 @@ export const Home: React.FC = () => {
                                                 {formatPrice(monthlyBudget)}
                                             </span>
                                             <button
-                                                onClick={() => setCurrentView('settings')}
+                                                onClick={() => navigateToView('settings')}
                                                 style={{
                                                     background: 'none',
                                                     border: 'none',
@@ -556,7 +629,7 @@ export const Home: React.FC = () => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-end' }}>
                                             <span style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-muted)' }}>未設定</span>
                                             <button
-                                                onClick={() => setCurrentView('settings')}
+                                                onClick={() => navigateToView('settings')}
                                                 style={{
                                                     background: 'none',
                                                     border: '1px solid var(--primary)',
@@ -579,8 +652,8 @@ export const Home: React.FC = () => {
                                     <div
                                         style={{
                                             height: '100%',
-                                            background: totalWishlistAmount > monthlyBudget ? 'var(--danger)' : 'var(--primary)',
-                                            width: `${Math.min((totalWishlistAmount / monthlyBudget) * 100, 100)}%`,
+                                            background: currentMonthPlannedAmount > monthlyBudget ? 'var(--danger)' : 'var(--primary)',
+                                            width: `${Math.min((currentMonthPlannedAmount / monthlyBudget) * 100, 100)}%`,
                                             transition: 'width 0.5s ease',
                                             borderRadius: '4px'
                                         }}
@@ -588,9 +661,9 @@ export const Home: React.FC = () => {
                                 </div>
                             )}
 
-                            {monthlyBudget > 0 && totalWishlistAmount > monthlyBudget && (
+                            {monthlyBudget > 0 && currentMonthPlannedAmount > monthlyBudget && (
                                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--danger)', textAlign: 'right' }}>
-                                    予算を {formatPrice(totalWishlistAmount - monthlyBudget)} オーバーしています。
+                                    今月予定分が予算を {formatPrice(currentMonthPlannedAmount - monthlyBudget)} オーバーしています。
                                 </p>
                             )}
                         </div>
@@ -730,9 +803,7 @@ export const Home: React.FC = () => {
                         onClose={() => setIsEventFormOpen(false)}
                         onSave={async eventData => {
                             await addCalendarEvent(eventData);
-                            const previousView = currentView;
-                            setCurrentView('my-wishlist');
-                            window.setTimeout(() => setCurrentView(previousView), 10);
+                            setCalendarRefreshKey(previous => previous + 1);
                         }}
                         initialDate={selectedEventDate}
                     />
@@ -749,7 +820,7 @@ export const Home: React.FC = () => {
                 visible={['my-wishlist', 'groups'].includes(currentView)}
             />
 
-            <BottomNav currentView={currentView} onNavigate={setCurrentView} onAuthRequest={() => setIsAuthModalOpen(true)} />
+            <BottomNav currentView={currentView} onNavigate={navigateToView} onAuthRequest={() => setIsAuthModalOpen(true)} />
         </div>
     );
 };
