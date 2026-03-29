@@ -1,8 +1,9 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Cake, Check, LogIn, UserPlus } from 'lucide-react';
-import { searchUserByUsername, getPublicProfileItems, reserveItem, cancelReservation } from '../lib/db';
+import { addFriend, cancelReservation, getFriends, getPublicProfileItems, reserveItem, searchUserByUsername } from '../lib/db';
 import type { Item, Profile } from '../lib/types';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
 import { ItemCard } from '../components/ItemCard';
 import { ItemForm } from '../components/ItemForm';
@@ -52,13 +53,11 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
 
                 if (user && user.id !== foundProfile.id) {
                     try {
-                        const { getFriends } = await import('../lib/db');
                         const friendsList = await getFriends();
 
                         if (friendsList.find(friend => friend.id === foundProfile.id)) {
                             setFriendStatus('friends');
                         } else {
-                            const { supabase } = await import('../lib/supabase');
                             const { data: existing } = await supabase
                                 .from('friendships')
                                 .select('status')
@@ -115,7 +114,6 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
 
         setRequesting(true);
         try {
-            const { addFriend } = await import('../lib/db');
             await addFriend(profile.id);
             setFriendStatus('pending');
             window.alert('フレンドリクエストを送信しました。');
@@ -377,3 +375,6 @@ export const PublicProfile: React.FC<PublicProfileProps> = ({ username }) => {
         </div>
     );
 };
+
+
+

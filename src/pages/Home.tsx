@@ -1,21 +1,16 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Search, Share2, Upload } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../contexts/AuthContext';
 import { AuthModal } from '../components/AuthModal';
 import { ItemCard } from '../components/ItemCard';
 import { ItemForm } from '../components/ItemForm';
-import { MonthlyExpenseChart } from '../components/MonthlyExpenseChart';
-import { FriendManager } from '../components/friends/FriendManager';
-import { GroupManager } from '../components/groups/GroupManager';
-import { CalendarView } from '../components/calendar/CalendarView';
-import { EventForm } from '../components/calendar/EventForm';
+
 import { BottomNav } from '../components/layout/BottomNav';
 import { FloatingActionButton } from '../components/layout/FloatingActionButton';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Settings } from './Settings';
-import { addCalendarEvent, addItem, addMultipleItems, deleteItem, getItems, updateItem } from '../lib/db';
+import { addCalendarEvent, addItem, addMultipleItems, deleteItem, getItems, getMonthlyBudget, getMonthlyBudgets, updateItem } from '../lib/db';
 import { generateShareLink, importDataFromJsonFile, parseSharedItemsFromUrl } from '../lib/shareUtils';
 import { formatPrice, parsePriceString } from '../lib/utils';
 import type { Item } from '../lib/types';
@@ -33,6 +28,19 @@ const formatMonthLabel = (monthKey: string) => {
     const [year, month] = monthKey.split('-');
     return `${year}年${month}月`;
 };
+
+const CalendarView = lazy(() => import('../components/calendar/CalendarView').then(module => ({ default: module.CalendarView })));
+const EventForm = lazy(() => import('../components/calendar/EventForm').then(module => ({ default: module.EventForm })));
+const MonthlyExpenseChart = lazy(() => import('../components/MonthlyExpenseChart').then(module => ({ default: module.MonthlyExpenseChart })));
+const FriendManager = lazy(() => import('../components/friends/FriendManager').then(module => ({ default: module.FriendManager })));
+const GroupManager = lazy(() => import('../components/groups/GroupManager').then(module => ({ default: module.GroupManager })));
+const Settings = lazy(() => import('./Settings').then(module => ({ default: module.Settings })));
+
+const SectionLoader: React.FC<{ label?: string }> = ({ label = '読み込み中...' }) => (
+    <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        {label}
+    </div>
+);
 
 export const Home: React.FC = () => {
     const { user } = useAuth();
@@ -58,27 +66,39 @@ export const Home: React.FC = () => {
         setItems(data);
     }, []);
 
-    const loadProfileData = useCallback(async () => {
-        if (!user) {
-            setMonthlyBudget(0);
-            return;
-        }
-
-        const { getMonthlyBudget } = await import('../lib/db');
-        const currentMonth = getMonthKeyFromTimestamp(Date.now());
-        const budget = await getMonthlyBudget(currentMonth);
-        setMonthlyBudget(budget > 0 ? budget : 0);
-    }, [user]);
-
     useEffect(() => {
-        if (currentView === 'my-wishlist' || currentView === 'calendar') {
-            void loadItems();
-        }
+        let cancelled = false;
 
-        if (currentView === 'my-wishlist') {
-            void loadProfileData();
-        }
-    }, [currentView, loadItems, loadProfileData]);
+        const syncViewData = async () => {
+            if (currentView === 'my-wishlist' || currentView === 'calendar') {
+                const data = await getItems();
+                if (!cancelled) {
+                    setItems(data);
+                }
+            }
+
+            if (currentView === 'my-wishlist') {
+                if (!user) {
+                    if (!cancelled) {
+                        setMonthlyBudget(0);
+                    }
+                    return;
+                }
+
+                const currentMonth = getMonthKeyFromTimestamp(Date.now());
+                const budget = await getMonthlyBudget(currentMonth);
+                if (!cancelled) {
+                    setMonthlyBudget(budget > 0 ? budget : 0);
+                }
+            }
+        };
+
+        void syncViewData();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [currentView, user]);
 
     useEffect(() => {
         const sharedData = parseSharedItemsFromUrl();
@@ -105,24 +125,42 @@ export const Home: React.FC = () => {
     }, [loadItems]);
 
     useEffect(() => {
-        if (filterObtained !== 'obtained') return;
+        let cancelled = false;
 
-        const monthsToFetch = Array.from(
-            new Set(
-                items
-                    .filter(item => item.obtained)
-                    .map(item => getMonthKeyFromTimestamp(item.obtainedAt || item.createdAt))
-            )
-        );
+        const syncMonthlyBudgets = async () => {
+            if (filterObtained !== 'obtained') {
+                if (!cancelled) {
+                    setMonthlyBudgetsMap({});
+                }
+                return;
+            }
 
-        if (monthsToFetch.length === 0) {
-            setMonthlyBudgetsMap({});
-            return;
-        }
+            const monthsToFetch = Array.from(
+                new Set(
+                    items
+                        .filter(item => item.obtained)
+                        .map(item => getMonthKeyFromTimestamp(item.obtainedAt || item.createdAt))
+                )
+            );
 
-        import('../lib/db').then(({ getMonthlyBudgets }) => {
-            getMonthlyBudgets(monthsToFetch).then(setMonthlyBudgetsMap);
-        });
+            if (monthsToFetch.length === 0) {
+                if (!cancelled) {
+                    setMonthlyBudgetsMap({});
+                }
+                return;
+            }
+
+            const budgets = await getMonthlyBudgets(monthsToFetch);
+            if (!cancelled) {
+                setMonthlyBudgetsMap(budgets);
+            }
+        };
+
+        void syncMonthlyBudgets();
+
+        return () => {
+            cancelled = true;
+        };
     }, [filterObtained, items]);
 
     const categories = useMemo(() => {
@@ -130,11 +168,7 @@ export const Home: React.FC = () => {
         return ['all', ...Array.from(new Set(values))];
     }, [items]);
 
-    useEffect(() => {
-        if (selectedCategory !== 'all' && !categories.includes(selectedCategory)) {
-            setSelectedCategory('all');
-        }
-    }, [categories, selectedCategory]);
+    const activeCategory = categories.includes(selectedCategory) ? selectedCategory : 'all';
 
     const handleSaveItem = async (item: Item) => {
         if (editingItem) {
@@ -217,8 +251,8 @@ export const Home: React.FC = () => {
             );
         }
 
-        if (selectedCategory !== 'all') {
-            result = result.filter(item => item.category === selectedCategory);
+        if (activeCategory !== 'all') {
+            result = result.filter(item => item.category === activeCategory);
         }
 
         if (filterObtained === 'not_obtained') {
@@ -243,7 +277,7 @@ export const Home: React.FC = () => {
         });
 
         return result;
-    }, [filterObtained, items, searchQuery, selectedCategory, sortOrder]);
+    }, [activeCategory, filterObtained, items, searchQuery, sortOrder]);
 
     const totalSpent = useMemo(
         () => items.filter(item => item.obtained).reduce((sum, item) => sum + parsePriceString(item.price), 0),
@@ -269,50 +303,64 @@ export const Home: React.FC = () => {
         }, {});
     }, [displayedItems]);
 
-    const hasActiveFilters = Boolean(searchQuery) || selectedCategory !== 'all' || sortOrder !== 'newest';
+    const hasActiveFilters = Boolean(searchQuery) || activeCategory !== 'all' || sortOrder !== 'newest';
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 100px 1rem' }}>
             {currentView === 'calendar' && (
-                <>
-                    <CalendarView
-                        onOpenEventForm={date => {
-                            setSelectedEventDate(date);
-                            setIsEventFormOpen(true);
-                        }}
-                        onItemClick={item => {
-                            setEditingItem(item);
-                            setIsFormOpen(true);
-                        }}
-                    />
+                <Suspense fallback={<SectionLoader label="カレンダーを読み込んでいます..." />}>
+                    <>
+                        <CalendarView
+                            onOpenEventForm={date => {
+                                setSelectedEventDate(date);
+                                setIsEventFormOpen(true);
+                            }}
+                            onItemClick={item => {
+                                setEditingItem(item);
+                                setIsFormOpen(true);
+                            }}
+                        />
 
-                    <div style={{ marginTop: '2rem' }}>
-                        <MonthlyExpenseChart items={items} />
-                        {totalSpent > 0 && (
-                            <div
-                                style={{
-                                    marginBottom: '1.5rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem',
-                                    background: 'rgba(255, 255, 255, 0.05)',
-                                    padding: '0.75rem 1rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    border: '1px solid var(--glass-border)'
-                                }}
-                            >
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>これまでの支出合計</span>
-                                <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '0.02em' }}>
-                                    {formatPrice(totalSpent)}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </>
+                        <div style={{ marginTop: '2rem' }}>
+                            <MonthlyExpenseChart items={items} />
+                            {totalSpent > 0 && (
+                                <div
+                                    style={{
+                                        marginBottom: '1.5rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: '1px solid var(--glass-border)'
+                                    }}
+                                >
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>これまでの支出合計</span>
+                                    <span style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '1.25rem', letterSpacing: '0.02em' }}>
+                                        {formatPrice(totalSpent)}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                </Suspense>
             )}
-            {currentView === 'friends' && <FriendManager onBack={() => setCurrentView('my-wishlist')} />}
-            {currentView === 'groups' && <GroupManager onBack={() => setCurrentView('my-wishlist')} />}
-            {currentView === 'settings' && <Settings onBack={() => setCurrentView('my-wishlist')} />}
+            {currentView === 'friends' && (
+                <Suspense fallback={<SectionLoader label="フレンド情報を読み込んでいます..." />}>
+                    <FriendManager onBack={() => setCurrentView('my-wishlist')} />
+                </Suspense>
+            )}
+            {currentView === 'groups' && (
+                <Suspense fallback={<SectionLoader label="グループ情報を読み込んでいます..." />}>
+                    <GroupManager onBack={() => setCurrentView('my-wishlist')} />
+                </Suspense>
+            )}
+            {currentView === 'settings' && (
+                <Suspense fallback={<SectionLoader label="設定を読み込んでいます..." />}>
+                    <Settings onBack={() => setCurrentView('my-wishlist')} />
+                </Suspense>
+            )}
 
             {currentView === 'my-wishlist' && (
                 <>
@@ -668,18 +716,20 @@ export const Home: React.FC = () => {
             />
 
             {isEventFormOpen && (
-                <EventForm
-                    key={selectedEventDate?.toISOString() ?? 'new-event'}
-                    isOpen={isEventFormOpen}
-                    onClose={() => setIsEventFormOpen(false)}
-                    onSave={async eventData => {
-                        await addCalendarEvent(eventData);
-                        const previousView = currentView;
-                        setCurrentView('my-wishlist');
-                        window.setTimeout(() => setCurrentView(previousView), 10);
-                    }}
-                    initialDate={selectedEventDate}
-                />
+                <Suspense fallback={null}>
+                    <EventForm
+                        key={selectedEventDate?.toISOString() ?? 'new-event'}
+                        isOpen={isEventFormOpen}
+                        onClose={() => setIsEventFormOpen(false)}
+                        onSave={async eventData => {
+                            await addCalendarEvent(eventData);
+                            const previousView = currentView;
+                            setCurrentView('my-wishlist');
+                            window.setTimeout(() => setCurrentView(previousView), 10);
+                        }}
+                        initialDate={selectedEventDate}
+                    />
+                </Suspense>
             )}
 
             <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
@@ -792,3 +842,11 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ label, value, helper }) => {
         </div>
     );
 };
+
+
+
+
+
+
+
+
