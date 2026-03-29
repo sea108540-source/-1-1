@@ -167,6 +167,7 @@ export const Home: React.FC = () => {
         const values = items.map(item => item.category).filter((category): category is string => Boolean(category?.trim()));
         return ['all', ...Array.from(new Set(values))];
     }, [items]);
+    const publicShareableCount = useMemo(() => items.filter(item => item.is_public !== false).length, [items]);
 
     const activeCategory = categories.includes(selectedCategory) ? selectedCategory : 'all';
 
@@ -203,6 +204,11 @@ export const Home: React.FC = () => {
     const handleShareLink = async () => {
         if (items.length === 0) {
             window.alert('共有できるアイテムがありません。');
+            return;
+        }
+
+        if (publicShareableCount === 0) {
+            window.alert('共有できる公開アイテムがありません。アイテム編集で公開設定をオンにしてください。');
             return;
         }
 
@@ -385,6 +391,7 @@ export const Home: React.FC = () => {
                             <DropdownActionButtons
                                 onShare={handleShareLink}
                                 copySuccess={copySuccess}
+                                shareableCount={publicShareableCount}
                                 onImportClick={() => fileInputRef.current?.click()}
                             />
                             <input type="file" accept=".json" ref={fileInputRef} style={{ display: 'none' }} onChange={handleImport} />
@@ -750,10 +757,11 @@ export const Home: React.FC = () => {
 interface DropdownActionButtonsProps {
     onShare: () => void;
     copySuccess: boolean;
+    shareableCount: number;
     onImportClick: () => void;
 }
 
-const DropdownActionButtons: React.FC<DropdownActionButtonsProps> = ({ onShare, copySuccess, onImportClick }) => {
+const DropdownActionButtons: React.FC<DropdownActionButtonsProps> = ({ onShare, copySuccess, shareableCount, onImportClick }) => {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -801,6 +809,19 @@ const DropdownActionButtons: React.FC<DropdownActionButtonsProps> = ({ onShare, 
                         overflow: 'hidden'
                     }}
                 >
+                    <div
+                        style={{
+                            padding: '0.75rem 1rem 0.5rem',
+                            borderBottom: '1px solid var(--glass-border)',
+                            fontSize: '0.75rem',
+                            color: 'var(--text-secondary)',
+                            lineHeight: 1.5
+                        }}
+                    >
+                        公開中のアイテムのみ共有されます。
+                        <br />
+                        現在の共有対象: {shareableCount}件
+                    </div>
                     <button
                         className="btn btn-ghost"
                         style={{ padding: '0.75rem 1rem', justifyContent: 'flex-start' }}
@@ -809,7 +830,7 @@ const DropdownActionButtons: React.FC<DropdownActionButtonsProps> = ({ onShare, 
                             setIsOpen(false);
                         }}
                     >
-                        {copySuccess ? <Check size={16} /> : <Share2 size={16} />} {copySuccess ? 'コピーしました' : '共有リンクをコピー'}
+                        {copySuccess ? <Check size={16} /> : <Share2 size={16} />} {copySuccess ? 'コピーしました' : '公開リンクをコピー'}
                     </button>
                     <button
                         className="btn btn-ghost"

@@ -1,15 +1,20 @@
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 import type { Item } from './types';
 
-type ShareableItem = Omit<Item, 'image' | 'obtainedAt'>;
+type ShareableItem = Pick<Item, 'title' | 'url' | 'memo' | 'priority' | 'category' | 'price' | 'target_date'>;
 
 export const generateShareLink = (items: Item[]): string => {
-    const sharedItems: ShareableItem[] = items.map(item => {
-        const rest = { ...item };
-        delete rest.image;
-        delete rest.obtainedAt;
-        return rest;
-    });
+    const sharedItems: ShareableItem[] = items
+        .filter(item => item.is_public !== false)
+        .map(item => ({
+            title: item.title,
+            url: item.url,
+            memo: item.memo,
+            priority: item.priority,
+            category: item.category,
+            price: item.price,
+            target_date: item.target_date,
+        }));
     const jsonString = JSON.stringify(sharedItems);
     const compressed = compressToEncodedURIComponent(jsonString);
     const baseUrl = window.location.origin + window.location.pathname;
